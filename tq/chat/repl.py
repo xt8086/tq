@@ -112,6 +112,7 @@ class ChatSession:
             response_text = ""
             tool_calls: list[ToolCall] = []
             current_tc: dict = {}
+            msg_count_before = len(self.messages)
 
             render_divider()
 
@@ -162,6 +163,11 @@ class ChatSession:
             except Exception as e:
                 print(flush=True)
                 render_error(f"Request failed: {e}")
+                if msg_count_before < len(self.messages):
+                    del self.messages[msg_count_before:]
+                if "500" in str(e) and tool_calls:
+                    render_info("Model may not support tool calling — retrying without tools")
+                    self._send_without_tools()
                 break
 
             if response_text:
@@ -172,18 +178,23 @@ class ChatSession:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
                 break
 
+            empty_args = []
             valid_tool_calls = []
             for tc in tool_calls:
                 args = tc.parsed_args()
-                if not args and not tc.arguments.strip():
-                    render_error(f"{tc.name}() called with no arguments — model may not support tool calling")
-                    response_text += f"\n[Tool {tc.name}() was called with no arguments and skipped.]"
+                if not args:
+                    empty_args.append(tc.name)
                     continue
                 valid_tool_calls.append(tc)
+
+            if empty_args:
+                render_error(f"{', '.join(empty_args)}() called with no/empty arguments — model may not support tool calling")
 
             if not valid_tool_calls:
                 if response_text:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
+                else:
+                    self.messages.append(ChatMessage(role="assistant", content="I attempted to use a tool but couldn't formulate the right arguments."))
                 break
 
             self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=valid_tool_calls))
@@ -204,6 +215,24 @@ class ChatSession:
 
         token_count = sum(len(m.content) for m in self.messages) // 4
         console.print(f"  [dim]{token_count:,} tokens in context[/dim]")
+
+    def _send_without_tools(self):
+        try:
+            response_text = ""
+            for chunk in self.client.stream_chat(
+                self.messages,
+                model=self.model,
+                tools=None,
+            ):
+                if chunk.delta_content:
+                    response_text += chunk.delta_content
+                    print(chunk.delta_content, end="", flush=True)
+            print(flush=True)
+            if response_text:
+                self.messages.append(ChatMessage(role="assistant", content=response_text))
+        except Exception as e:
+            print(flush=True)
+            render_error(f"Retry failed: {e}")
 
     def _handle_command(self, cmd: str) -> bool:
         parts = cmd.split(maxsplit=1)
