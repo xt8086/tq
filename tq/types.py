@@ -57,6 +57,8 @@ class ModelMetadata:
     expert_count: Optional[int] = None
     chat_template: Optional[str] = None
     gguf_metadata: dict = field(default_factory=dict)
+    mmproj_path: Optional[str] = None
+    is_multimodal: bool = False
 
     @property
     def size_gb(self) -> float:
@@ -120,6 +122,7 @@ class ServerConfig:
     extra_flags: list[str] = field(default_factory=list)
     api_key: Optional[str] = None
     idle_timeout: int = 300
+    mmproj_path: Optional[str] = None
 
     def to_command(self, binary_path: str) -> list[str]:
         cmd = [binary_path, "-m", self.model_path, "--port", str(self.port), "--host", self.host]
@@ -127,6 +130,8 @@ class ServerConfig:
             cmd.extend(self.tq.to_flags())
         if self.api_key:
             cmd.extend(["--api-key", self.api_key])
+        if self.mmproj_path:
+            cmd.extend(["--mmproj", self.mmproj_path])
         cmd.extend(self.extra_flags)
         return cmd
 

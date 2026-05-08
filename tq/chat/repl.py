@@ -43,6 +43,7 @@ class ChatSession:
         self.tools = ToolRegistry(self.workdir, self.perms)
         self.auto_started_server = False
         self.cancel_event = threading.Event()
+        self.tools_enabled = True
 
     def start(self):
         if not self.client.is_available():
@@ -128,7 +129,7 @@ class ChatSession:
                 for chunk in self.client.stream_chat(
                     self.messages,
                     model=self.model,
-                    tools=self.tools.get_tool_definitions() if self.tools.get_tool_definitions() else None,
+                    tools=self.tools.get_tool_definitions() if self.tools_enabled else None,
                 ):
                     if self.cancel_event.is_set():
                         break
@@ -170,6 +171,18 @@ class ChatSession:
                 break
             except Exception as e:
                 print(flush=True)
+                err_str = str(e)
+                if "500" in err_str and self.tools_enabled:
+                    render_error("Server error — disabling tools (model may not support function calling)")
+                    self.tools_enabled = False
+                    bad_tool_msgs = [m for m in self.messages if m.role == "tool"]
+                    for m in bad_tool_msgs:
+                        self.messages.remove(m)
+                    self.messages.append(ChatMessage(
+                        role="user",
+                        content="[Tool use failed. Continuing without tools. Please respond as text only.]",
+                    ))
+                    continue
                 render_error(f"Request failed: {e}")
                 break
 
@@ -201,6 +214,13 @@ class ChatSession:
                     has_errors = True
 
             if has_errors:
+                if self.tools_enabled:
+                    self.tools_enabled = False
+                    bad_tool_msgs = [m for m in self.messages if m.role == "tool"]
+                    for m in bad_tool_msgs:
+                        self.messages.remove(m)
+                    render_info("Tool errors detected — continuing without tools")
+                    continue
                 break
 
         token_count = sum(len(m.content) for m in self.messages) // 4
@@ -315,7 +335,9 @@ class ChatSession:
 
         msg_count = len(self.messages)
         token_est = sum(len(m.content) for m in self.messages) // 4
+        tools_status = "enabled" if self.tools_enabled else "disabled (model doesn't support tool calling)"
         console.print(f"  Messages: {msg_count}, ~{token_est:,} tokens")
+        console.print(f"  Tools: {tools_status}")
 
     def _cmd_tools(self):
         console.print("  [bold]Available tools:[/bold]")
@@ -402,6 +424,7 @@ class ChatSession:
             host=host,
             tq=rec,
             idle_timeout=cfg.load_config().get("idle_timeout", 300),
+            mmproj_path=meta.mmproj_path if meta.is_multimodal else None,
         )
 
         console.print("  [dim]Starting tq serve...[/dim]")

@@ -43,10 +43,11 @@ def cmd_list(args):
 
     for i, m in enumerate(models, 1):
         quant = m.quant_type.value if m.quant_type.value != "UNKNOWN" else ""
+        mm = " [bold green]multimodal[/]" if m.is_multimodal else ""
         line = f"{i}. {m.display_name}  ({m.size_gb:.1f}G"
         if quant:
             line += f", {quant}"
-        line += ")"
+        line += f"){mm}"
         console.print(line)
         console.print(f"   {m.path}")
         if i < len(models):
@@ -116,6 +117,12 @@ def cmd_serve(args):
             size_bytes=os.path.getsize(model_path),
         )
 
+    from .scanner import _find_mmproj
+    mmproj = _find_mmproj(model_path)
+    if mmproj:
+        meta.mmproj_path = mmproj
+        meta.is_multimodal = True
+
     hw = detect_hardware()
     ctx = args.context
 
@@ -126,7 +133,8 @@ def cmd_serve(args):
         f"[bold]Size:[/bold]    {meta.size_gb:.1f} GB\n"
         f"[bold]Quant:[/bold]   {meta.quant_type.value}\n"
         f"[bold]Hardware:[/bold] {hw.gpu_name} ({hw.ram_gb:.0f} GB)\n"
-        f"\n[bold]TQ Config:[/bold]\n"
+        + (f"[bold]Multimodal:[/bold] Yes (mmproj detected)\n" if meta.is_multimodal else "")
+        + f"\n[bold]TQ Config:[/bold]\n"
         f"  ctk = {rec.cache_type_k.value}\n"
         f"  ctv = {rec.cache_type_v.value}\n"
         f"  boundary_v = {rec.boundary_v}\n"
@@ -153,6 +161,7 @@ def cmd_serve(args):
         extra_flags=extra_flags,
         api_key=api_key,
         idle_timeout=idle_timeout,
+        mmproj_path=meta.mmproj_path if meta.is_multimodal else None,
     )
 
     try:

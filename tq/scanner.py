@@ -29,13 +29,17 @@ def scan_models(model_dir: str, system_wide: bool = False) -> list[ModelMetadata
             seen_paths.add(resolved)
             try:
                 meta = build_model_metadata(entry)
-                results.append(meta)
             except (GGUFParserError, OSError):
-                results.append(ModelMetadata(
+                meta = ModelMetadata(
                     name=os.path.basename(entry),
                     path=entry,
                     size_bytes=os.path.getsize(entry),
-                ))
+                )
+            mmproj = _find_mmproj(entry)
+            if mmproj:
+                meta.mmproj_path = mmproj
+                meta.is_multimodal = True
+            results.append(meta)
 
     results.sort(key=lambda m: m.name.lower())
     return results
@@ -125,10 +129,38 @@ def _walk_gguf_files(directory: str):
 
 def _load_or_stub(path: str) -> ModelMetadata:
     try:
-        return build_model_metadata(path)
+        meta = build_model_metadata(path)
     except (GGUFParserError, OSError):
-        return ModelMetadata(
+        meta = ModelMetadata(
             name=os.path.basename(path),
             path=path,
             size_bytes=os.path.getsize(path),
         )
+    mmproj = _find_mmproj(path)
+    if mmproj:
+        meta.mmproj_path = mmproj
+        meta.is_multimodal = True
+    return meta
+
+
+def _find_mmproj(model_path: str) -> Optional[str]:
+    model_dir = os.path.dirname(model_path)
+    model_name = os.path.basename(model_path).lower()
+    model_name = model_name.replace(".gguf", "").replace("-q4_k_m", "").replace("-q5_k_m", "").replace("-q4_0", "").replace("-q5_0", "").replace("-q8_0", "").replace("-f16", "").replace("-f32", "")
+
+    for f in _walk_gguf_files(model_dir):
+        basename = os.path.basename(f).lower()
+        if not (basename.startswith("mmproj-") or basename.startswith("mmproj_")):
+            continue
+        return f
+
+    parent_dir = os.path.dirname(model_dir)
+    for f in _walk_gguf_files(parent_dir):
+        basename = os.path.basename(f).lower()
+        if not (basename.startswith("mmproj-") or basename.startswith("mmproj_")):
+            continue
+        mmproj_dir = os.path.dirname(f)
+        if model_dir.startswith(mmproj_dir) or mmproj_dir.startswith(model_dir):
+            return f
+
+    return None
