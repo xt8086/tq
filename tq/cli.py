@@ -349,6 +349,36 @@ def cmd_doctor(args):
         console.print("\n[green]All checks passed.[/green]")
 
 
+def cmd_chat(args):
+    try:
+        from .chat.repl import ChatSession
+        from .chat.permissions import PermissionConfig
+    except ImportError:
+        console.print("[red]Chat dependencies not installed.[/red]")
+        console.print("[dim]Install with: pip install tq-serve[chat][/dim]")
+        sys.exit(1)
+
+    perms = PermissionConfig.defaults()
+    if args.yolo:
+        from .chat.permissions import PermissionAction
+        perms = PermissionConfig.from_dict({"*": PermissionAction.ALLOW})
+    if args.ask_all:
+        from .chat.permissions import PermissionAction
+        perms = PermissionConfig.from_dict({"*": PermissionAction.ASK})
+
+    base_url = f"http://{args.host}:{args.port}"
+
+    session = ChatSession(
+        base_url=base_url,
+        model=args.model or "",
+        workdir=args.workdir or os.getcwd(),
+        no_serve=args.no_serve,
+        system_prompt=args.system or "",
+        perms=perms,
+    )
+    session.start()
+
+
 def cmd_config(args):
     if args.action == "show" or args.action is None:
         config = cfg.load_config()
@@ -426,6 +456,16 @@ def main():
     cf.add_argument("key", nargs="?", help="Config key")
     cf.add_argument("value", nargs="?", help="Config value")
 
+    ch = sub.add_parser("chat", help="Interactive coding agent (local AI)")
+    ch.add_argument("-m", "--model", help="Model name to use")
+    ch.add_argument("-p", "--port", type=int, default=8080, help="Server port")
+    ch.add_argument("--host", default="127.0.0.1", help="Server host")
+    ch.add_argument("-w", "--workdir", help="Working directory (default: cwd)")
+    ch.add_argument("--no-serve", action="store_true", help="Don't auto-start server")
+    ch.add_argument("-s", "--system", help="Custom system prompt")
+    ch.add_argument("--yolo", action="store_true", help="Allow all tool actions without asking")
+    ch.add_argument("--ask-all", action="store_true", help="Ask permission for all actions")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -449,6 +489,7 @@ def main():
         "install": cmd_install,
         "doctor": cmd_doctor,
         "config": cmd_config,
+        "chat": cmd_chat,
     }
 
     fn = commands.get(args.command)

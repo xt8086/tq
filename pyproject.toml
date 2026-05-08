@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tq-serve"
-version = "0.1.0"
+version = "0.2.0"
 description = "TurboQuant model server manager — auto-configured llama-server with KV cache compression"
 readme = "README.md"
 license = "MIT"
@@ -17,6 +17,7 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -37,6 +38,7 @@ dependencies = [
 tq = "tq.cli:main"
 
 [project.optional-dependencies]
+chat = ["httpx>=0.25", "prompt_toolkit>=3.0"]
 dev = ["pytest>=7.0", "pytest-mock>=3.0"]
 
 [project.urls]
