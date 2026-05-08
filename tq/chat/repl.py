@@ -37,7 +37,6 @@ class ChatSession:
         self.perms = perms or PermissionConfig.defaults()
         self.messages: list[ChatMessage] = []
         self.tools = ToolRegistry(self.workdir, self.perms)
-        self.tools_disabled = False
         self.cancel_event = threading.Event()
 
     def start(self):
@@ -120,7 +119,7 @@ class ChatSession:
                 for chunk in self.client.stream_chat(
                     self.messages,
                     model=self.model,
-                    tools=None if self.tools_disabled else self.tools.get_tool_definitions(),
+                    tools=self.tools.get_tool_definitions(),
                 ):
                     if self.cancel_event.is_set():
                         break
@@ -177,8 +176,7 @@ class ChatSession:
             for tc in tool_calls:
                 args = tc.parsed_args()
                 if not args and not tc.arguments.strip():
-                    render_error(f"{tc.name}() called with no arguments — disabling tools for this model")
-                    self.tools_disabled = True
+                    render_error(f"{tc.name}() called with no arguments — model may not support tool calling")
                     response_text += f"\n[Tool {tc.name}() was called with no arguments and skipped.]"
                     continue
                 valid_tool_calls.append(tc)
