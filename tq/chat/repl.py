@@ -24,7 +24,7 @@ import threading
 
 
 def extract_python_blocks(text: str) -> list[str]:
-    return re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
+    return re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
 
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
@@ -511,11 +511,15 @@ class ChatSession:
         return (
             "\n\nIMPORTANT: You do NOT have access to tool-calling. "
             "Instead, when you need to execute commands or perform actions, "
-            "write Python code inside ```python code blocks. "
-            "Your code will be automatically extracted and executed, and the output will be fed back to you. "
-            "You can use subprocess.run() for shell commands, os for file operations, "
-            "and any standard library module. Always print your results. "
+            "write Python code inside ```exec code blocks. "
+            "Your code will be automatically extracted, executed, and the output fed back to you. "
             "Only write code you actually need executed — do not write example or illustrative code blocks. "
-            "For shell commands, prefer: subprocess.run(['cmd', 'arg'], capture_output=True, text=True). "
+            "For shell commands, use: subprocess.run(['cmd', 'arg'], capture_output=True, text=True). "
+            "For HTTP requests, use: urllib.request.urlopen(url) or subprocess.run(['curl', url], capture_output=True, text=True). "
+            "For web search, use: urllib.request.Request('https://mcp.exa.ai/mcp', ...) with JSON-RPC. "
+            "NEVER write mock data, placeholder responses, or simulated output. "
+            "NEVER use ```python blocks for executable code — use ```exec instead. "
+            "Use ```python only for illustrative examples you do NOT want executed. "
+            "Always print your results so they appear in the output. "
             f"Working directory: {self.workdir}"
         )
