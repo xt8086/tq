@@ -222,15 +222,12 @@ class ChatSession:
                 render_error(f"{', '.join(empty_args)}() called with no/empty arguments — model may not support tool calling")
                 if not self.tools_disabled:
                     self.tools_disabled = True
-                    render_info("Tools disabled for this session — switching to code block execution mode")
+                    render_info("Switching to code block execution mode — retrying...")
                     if self.messages and self.messages[0].role == "system":
                         self.messages[0].content += self._code_block_system_addendum()
-
-            if not valid_tool_calls:
-                if response_text:
-                    self.messages.append(ChatMessage(role="assistant", content=response_text))
-                else:
-                    self.messages.append(ChatMessage(role="assistant", content="I attempted to use a tool but couldn't formulate the right arguments."))
+                    if msg_count_before < len(self.messages):
+                        del self.messages[msg_count_before:]
+                    self._send_and_process_no_tools()
                 break
 
             self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=valid_tool_calls))
