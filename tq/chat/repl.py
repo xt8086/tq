@@ -514,7 +514,7 @@ class ChatSession:
         )
 
     def _code_block_system_addendum(self) -> str:
-        return (
+        base = (
             "\n\nIMPORTANT: You do NOT have access to tool-calling. "
             "Instead, when you need to execute commands or perform actions, "
             "write Python code inside ```exec code blocks. "
@@ -524,7 +524,7 @@ class ChatSession:
             "1. Use ```exec for code you want executed. Use ```python only for examples you do NOT want executed.\n"
             "2. For shell commands: subprocess.run(['cmd', 'arg'], capture_output=True, text=True)\n"
             "3. For HTTP requests: use subprocess.run(['curl', '-s', url], capture_output=True, text=True) — this works without any API key or library.\n"
-            "4. For web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-d', json_body], capture_output=True, text=True)\n"
+            "4. For web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
             "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
             "6. NEVER import requests — it is not installed. Use curl via subprocess instead.\n"
             "7. Always print your results so they appear in the output.\n"
@@ -534,5 +534,16 @@ class ChatSession:
             "- IP info: subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True)\n"
             "- Web fetch: subprocess.run(['curl', '-s', '-L', url], capture_output=True, text=True)\n"
             "- Web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
-            f"Working directory: {self.workdir}"
         )
+        if self._is_multimodal():
+            base += (
+                "\n\nVISION: You have multimodal/vision capabilities. You can analyze images and documents.\n"
+                "For PDF files: extract text using subprocess.run(['python3', '-c', 'import subprocess; r=subprocess.run([\"pdftotext\",\"PATH\",\"-\"],capture_output=True,text=True); print(r.stdout)'], capture_output=True, text=True)\n"
+                "If pdftotext is not available, tell the user to provide the content as text or screenshot.\n"
+            )
+        base += f"\nWorking directory: {self.workdir}"
+        return base
+
+    def _is_multimodal(self) -> bool:
+        state = load_state()
+        return state is not None and state.is_multimodal

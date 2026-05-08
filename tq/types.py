@@ -154,3 +154,4 @@ class ServerState:
     started_at: float
     idle_timeout: int = 300
     tool_support: str = "none"
+    is_multimodal: bool = False

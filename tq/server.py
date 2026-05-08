@@ -54,6 +54,7 @@ def start_server(config: ServerConfig, dry_run: bool = False) -> Optional[Server
         started_at=time.time(),
         idle_timeout=config.idle_timeout,
         tool_support=getattr(config, 'tool_support', 'none'),
+        is_multimodal=bool(config.mmproj_path),
     )
 
     _save_state(state)
@@ -137,6 +138,7 @@ def load_state() -> Optional[ServerState]:
             started_at=data["started_at"],
             idle_timeout=data.get("idle_timeout", 300),
             tool_support=data.get("tool_support", "none"),
+            is_multimodal=data.get("is_multimodal", False),
         )
     except (json.JSONDecodeError, KeyError):
         return None
@@ -154,6 +156,7 @@ def _save_state(state: ServerState) -> None:
         "started_at": state.started_at,
         "idle_timeout": state.idle_timeout,
         "tool_support": state.tool_support,
+        "is_multimodal": state.is_multimodal,
     })
     secure_write_json(STATE_FILE, data)
 
