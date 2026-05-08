@@ -109,7 +109,7 @@ def cmd_serve(args):
             sys.exit(1)
         for i, m in enumerate(models, 1):
             mm = " [bold green]multimodal[/]" if m.is_multimodal else ""
-            console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G){mm}")
+            console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G){mm}", highlight=False)
         try:
             model_arg = input("  Serve which model? [number]: ").strip()
         except (EOFError, KeyboardInterrupt):
