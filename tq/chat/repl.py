@@ -533,6 +533,6 @@ class ChatSession:
             "- Weather JSON: subprocess.run(['curl', '-s', 'wttr.in/92880?format=j1'], capture_output=True, text=True)\n"
             "- IP info: subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True)\n"
             "- Web fetch: subprocess.run(['curl', '-s', '-L', url], capture_output=True, text=True)\n"
-            "- Web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-d', '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1}'], capture_output=True, text=True)\n"
+            "- Web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
             f"Working directory: {self.workdir}"
         )
