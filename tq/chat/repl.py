@@ -74,6 +74,7 @@ class ChatSession:
         self.tools_disabled = False
         self._code_exec_count = 0
         self._code_exec_limit = 5
+        self._is_mm = False
         self.cancel_event = threading.Event()
 
     def start(self):
@@ -97,6 +98,8 @@ class ChatSession:
 
         if tool_support == "none":
             self.tools_disabled = True
+
+        self._is_mm = bool(state and state.is_multimodal) if state else False
 
         if self.system_prompt:
             self.messages.append(ChatMessage(role="system", content=self.system_prompt))
@@ -368,10 +371,11 @@ class ChatSession:
                     images = load_pdf_as_images(expanded)
                     if images:
                         msg.images.extend(images)
-                        console.print(f"  [dim]Attached PDF: {raw_path} ({len(images)} page(s))[/dim]")
+                        console.print(f"  [dim]Attached PDF (vision): {raw_path} ({len(images)} page(s))[/dim]")
                 text_content = self._extract_pdf_text(expanded)
                 if text_content:
                     msg.content += f"\n\n[File content: {raw_path}]\n{text_content[:30000]}"
+                    console.print(f"  [dim]Attached PDF (text): {raw_path}[/dim]")
             elif ext in image_exts:
                 if self._is_multimodal():
                     img = load_image_as_base64(expanded)
@@ -594,7 +598,8 @@ class ChatSession:
             "4. For web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
             "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
             "6. NEVER import requests — it is not installed. Use curl via subprocess instead.\n"
-            "7. Always print your results so they appear in the output.\n"
+            "7. NEVER run pip install or install any packages — only use Python standard library and subprocess.\n"
+            "8. Always print your results so they appear in the output.\n"
             "\n\nFREE APIs (no key needed, use curl):\n"
             "- Weather: subprocess.run(['curl', '-s', 'wttr.in/92880?format=3'], capture_output=True, text=True)\n"
             "- Weather JSON: subprocess.run(['curl', '-s', 'wttr.in/92880?format=j1'], capture_output=True, text=True)\n"
@@ -612,5 +617,4 @@ class ChatSession:
         return base
 
     def _is_multimodal(self) -> bool:
-        state = load_state()
-        return state is not None and state.is_multimodal
+        return self._is_mm
