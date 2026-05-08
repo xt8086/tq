@@ -66,6 +66,8 @@ class ChatSession:
         self.messages: list[ChatMessage] = []
         self.tools = ToolRegistry(self.workdir, self.perms)
         self.tools_disabled = False
+        self._code_exec_count = 0
+        self._code_exec_limit = 5
         self.cancel_event = threading.Event()
 
     def start(self):
@@ -138,6 +140,7 @@ class ChatSession:
 
             self.messages.append(ChatMessage(role="user", content=user_input))
             self.cancel_event.clear()
+            self._code_exec_count = 0
             self._send_and_process()
 
     def _send_and_process(self):
@@ -259,7 +262,12 @@ class ChatSession:
         if not blocks:
             return
 
+        if self._code_exec_count >= self._code_exec_limit:
+            render_info(f"Code execution limit reached ({self._code_exec_limit}) — stopping to prevent loop")
+            return
+
         for code in blocks:
+            self._code_exec_count += 1
             preview = code.strip().split("\n")[0][:80]
             console.print(f"  [cyan]→ python: {preview}[/cyan]")
 
@@ -287,6 +295,10 @@ class ChatSession:
                 role="user",
                 content=f"[Code output]: {output}" + (" (ERROR)" if is_error else ""),
             ))
+
+            if self._code_exec_count >= self._code_exec_limit:
+                render_info(f"Code execution limit reached ({self._code_exec_limit})")
+                return
 
             self.cancel_event.clear()
             self._send_and_process_no_tools()
