@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .client import ChatClient, ChatMessage, ToolCall
+from .client import ChatClient, ChatMessage, ToolCall, load_image_as_base64, load_pdf_as_images
 from .tools import ToolRegistry, ToolResult
 from .permissions import PermissionConfig, PermissionAction
 from .render import (
@@ -144,7 +144,10 @@ class ChatSession:
                     break
                 continue
 
-            self.messages.append(ChatMessage(role="user", content=user_input))
+            msg = ChatMessage(role="user", content=user_input)
+            if self._is_multimodal():
+                msg = self._attach_files(user_input, msg)
+            self.messages.append(msg)
             self.cancel_event.clear()
             self._code_exec_count = 0
             self._send_and_process()
@@ -349,6 +352,27 @@ class ChatSession:
             print(flush=True)
             render_error(f"Retry failed: {e}")
 
+    def _attach_files(self, text: str, msg: ChatMessage) -> ChatMessage:
+        import re as _re
+        image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+        paths = _re.findall(r'(?:[\w./~-]+/[\w.-]+\.\w+|~/[\w./-]+\.\w+)', text)
+        for raw_path in paths:
+            expanded = os.path.expanduser(raw_path)
+            if not os.path.isfile(expanded):
+                continue
+            ext = os.path.splitext(expanded)[1].lower()
+            if ext == ".pdf":
+                images = load_pdf_as_images(expanded)
+                if images:
+                    msg.images.extend(images)
+                    console.print(f"  [dim]📎 Attached PDF: {raw_path} ({len(images)} page(s))[/dim]")
+            elif ext in image_exts:
+                img = load_image_as_base64(expanded)
+                if img:
+                    msg.images.append(img)
+                    console.print(f"  [dim]📎 Attached image: {raw_path}[/dim]")
+        return msg
+
     def _handle_command(self, cmd: str) -> bool:
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
@@ -537,9 +561,9 @@ class ChatSession:
         )
         if self._is_multimodal():
             base += (
-                "\n\nVISION: You have multimodal/vision capabilities. You can analyze images and documents.\n"
-                "For PDF files: extract text using subprocess.run(['python3', '-c', 'import subprocess; r=subprocess.run([\"pdftotext\",\"PATH\",\"-\"],capture_output=True,text=True); print(r.stdout)'], capture_output=True, text=True)\n"
-                "If pdftotext is not available, tell the user to provide the content as text or screenshot.\n"
+                "\n\nVISION: You have multimodal/vision capabilities. "
+                "When the user asks about an image or document, it will be attached automatically for you to see and analyze. "
+                "You do NOT need to extract text or use subprocess to read images/PDFs.\n"
             )
         base += f"\nWorking directory: {self.workdir}"
         return base

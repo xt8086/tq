@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Generator, Optional
@@ -26,6 +28,48 @@ class ChatMessage:
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_call_id: Optional[str] = None
     name: Optional[str] = None
+    images: list[str] = field(default_factory=list)
+
+
+def load_image_as_base64(path: str) -> Optional[str]:
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        ext = os.path.splitext(path)[1].lower()
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+        }
+        mime = mime_map.get(ext, "image/png")
+        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+    except Exception:
+        return None
+
+
+def load_pdf_as_images(path: str) -> list[str]:
+    try:
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                ["pdftoppm", "-png", "-r", "150", path, os.path.join(tmpdir, "page")],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                return []
+            images = []
+            for f in sorted(os.listdir(tmpdir)):
+                if f.endswith(".png"):
+                    img = load_image_as_base64(os.path.join(tmpdir, f))
+                    if img:
+                        images.append(img)
+            return images
+    except Exception:
+        return []
 
 
 @dataclass
@@ -136,7 +180,14 @@ class ChatClient:
 
     def _message_to_dict(self, msg: ChatMessage) -> dict:
         d: dict = {"role": msg.role}
-        if msg.content:
+        if msg.images:
+            content_parts = []
+            if msg.content:
+                content_parts.append({"type": "text", "text": msg.content})
+            for img_url in msg.images:
+                content_parts.append({"type": "image_url", "image_url": {"url": img_url}})
+            d["content"] = content_parts
+        elif msg.content:
             d["content"] = msg.content
         if msg.tool_calls:
             d["tool_calls"] = [
