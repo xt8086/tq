@@ -43,8 +43,6 @@ class ChatSession:
         self.tools = ToolRegistry(self.workdir, self.perms)
         self.auto_started_server = False
         self.cancel_event = threading.Event()
-        self.use_tool_role = True
-        self.tools_enabled = True
 
     def start(self):
         if not self.client.is_available():
@@ -119,8 +117,7 @@ class ChatSession:
 
     def _send_and_process(self):
         max_iterations = 20
-        server_errors = 0
-        for iteration in range(max_iterations):
+        for _ in range(max_iterations):
             response_text = ""
             tool_calls: list[ToolCall] = []
             current_tc: dict = {}
@@ -131,7 +128,7 @@ class ChatSession:
                 for chunk in self.client.stream_chat(
                     self.messages,
                     model=self.model,
-                    tools=self.tools.get_tool_definitions() if self.tools_enabled else None,
+                    tools=self.tools.get_tool_definitions(),
                 ):
                     if self.cancel_event.is_set():
                         break
@@ -173,26 +170,6 @@ class ChatSession:
                 break
             except Exception as e:
                 print(flush=True)
-                err_str = str(e)
-                server_errors += 1
-
-                if server_errors > 3:
-                    render_error("Too many server errors — stopping. Try /clear to reset the conversation.")
-                    break
-
-                is_server_error = "500" in err_str or "400" in err_str
-
-                if is_server_error:
-                    self._strip_tool_messages()
-                    self.tools_enabled = False
-                    self.use_tool_role = False
-                    self.messages.append(ChatMessage(
-                        role="user",
-                        content="[The previous message caused a server error. Tool calling has been disabled. Please respond with text only, do not attempt any tool calls.]",
-                    ))
-                    render_info("Server error — tools disabled, retrying as plain chat")
-                    continue
-
                 render_error(f"Request failed: {e}")
                 break
 
@@ -204,39 +181,20 @@ class ChatSession:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
                 break
 
-            if self.tools_enabled and tool_calls:
-                if self.use_tool_role:
-                    self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
-                else:
-                    self.messages.append(ChatMessage(role="assistant", content=response_text))
+            self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
 
-                tool_results = []
-                for tc in tool_calls:
-                    args = tc.parsed_args()
-                    render_tool_call(tc.name, args)
-                    result = self.tools.execute(tc)
-                    render_tool_result(tc.name, result.output, result.error)
+            for tc in tool_calls:
+                args = tc.parsed_args()
+                render_tool_call(tc.name, args)
+                result = self.tools.execute(tc)
+                render_tool_result(tc.name, result.output, result.error)
 
-                    if self.use_tool_role:
-                        self.messages.append(ChatMessage(
-                            role="tool",
-                            content=result.output,
-                            tool_call_id=tc.id,
-                            name=tc.name,
-                        ))
-                    else:
-                        tool_results.append(f"Tool {tc.name} result: {result.output}")
-
-                if not self.use_tool_role and tool_results:
-                    self.messages.append(ChatMessage(
-                        role="user",
-                        content="\n\n".join(tool_results),
-                    ))
-            elif response_text:
-                self.messages.append(ChatMessage(role="assistant", content=response_text))
-                break
-            else:
-                break
+                self.messages.append(ChatMessage(
+                    role="tool",
+                    content=result.output,
+                    tool_call_id=tc.id,
+                    name=tc.name,
+                ))
 
         token_count = sum(len(m.content) for m in self.messages) // 4
         print(f"  [dim]{token_count:,} tokens in context[/dim]", flush=True)
@@ -350,9 +308,7 @@ class ChatSession:
 
         msg_count = len(self.messages)
         token_est = sum(len(m.content) for m in self.messages) // 4
-        tools_status = f"enabled (role={'native' if self.use_tool_role else 'inline'})" if self.tools_enabled else "disabled (model doesn't support tool calling)"
         console.print(f"  Messages: {msg_count}, ~{token_est:,} tokens")
-        console.print(f"  Tools: {tools_status}")
 
     def _cmd_tools(self):
         console.print("  [bold]Available tools:[/bold]")
@@ -467,17 +423,13 @@ class ChatSession:
             except Exception:
                 pass
 
-    def _strip_tool_messages(self):
-        self.messages = [
-            m for m in self.messages
-            if m.role != "tool" and not (m.role == "assistant" and m.tool_calls)
-        ]
-
     def _default_system_prompt(self) -> str:
         return (
             "You are an AI coding assistant running locally via tq chat. "
             "You have access to tools for reading, writing, editing files, "
             "running bash commands, searching the web, and more. "
             "Be concise and direct. Use tools when needed to accomplish tasks. "
+            "If a tool call fails or returns an error, report the error to the user and move on. "
+            "Do not retry failed tool calls. "
             f"Working directory: {self.workdir}"
         )
