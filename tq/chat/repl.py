@@ -172,15 +172,16 @@ class ChatSession:
             except Exception as e:
                 print(flush=True)
                 err_str = str(e)
-                if "500" in err_str and self.use_tool_role:
-                    self.use_tool_role = False
+                if "500" in err_str:
+                    if self.use_tool_role:
+                        self.use_tool_role = False
                     tool_msgs = [m for m in self.messages if m.role == "tool"]
                     for m in tool_msgs:
                         self.messages.remove(m)
-                    last_assistant = [m for m in self.messages if m.role == "assistant" and m.tool_calls]
-                    for m in last_assistant:
+                    assistant_with_tools = [m for m in self.messages if m.role == "assistant" and m.tool_calls]
+                    for m in assistant_with_tools:
                         self.messages.remove(m)
-                    render_info("Model doesn't support tool role — retrying with inline tool results")
+                    render_info("Tool call caused server error — cleaned up and retrying")
                     continue
                 render_error(f"Request failed: {e}")
                 break
@@ -193,7 +194,16 @@ class ChatSession:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
                 break
 
-            self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
+            if self.use_tool_role:
+                self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
+            else:
+                call_descriptions = []
+                for tc in tool_calls:
+                    call_descriptions.append(f"[Called tool: {tc.name}({tc.arguments})]")
+                self.messages.append(ChatMessage(
+                    role="assistant",
+                    content=(response_text + "\n" + "\n".join(call_descriptions)).strip(),
+                ))
 
             tool_results = []
             for tc in tool_calls:
