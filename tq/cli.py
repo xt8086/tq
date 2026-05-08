@@ -17,7 +17,7 @@ from .scanner import scan_models, find_model, resolve_model_path
 from .parser import build_model_metadata, GGUFParserError
 from .hardware import detect_hardware
 from .recommender import recommend
-from .server import start_server, stop_server, get_server_status, load_state, _find_binary
+from .server import start_server, stop_server, get_server_status, load_state, _find_binary, _check_health
 from .hf import search_models as hf_search, download_model
 from .installer import install_binary, get_platform_tag
 from .types import ServerConfig, CacheType
@@ -198,8 +198,18 @@ def cmd_serve(args):
 
     existing = load_state()
     if existing:
-        console.print("[yellow]A server is already running.[/yellow] Use 'tq stop' first.")
-        sys.exit(1)
+        healthy = _check_health(existing.host, existing.port)
+        status_text = "HEALTHY" if healthy else "UNHEALTHY"
+        console.print(Panel(
+            f"[bold]Model:[/bold]    {os.path.basename(existing.model_path)}\n"
+            f"[bold]PID:[/bold]       {existing.pid}\n"
+            f"[bold]Address:[/bold]  http://{existing.host}:{existing.port}\n"
+            f"[bold]Status:[/bold]  {status_text}",
+            title="Server Already Running",
+            box=box.ROUNDED,
+        ))
+        console.print("[dim]Run [bold]tq stop[/bold] first, then [bold]tq serve[/bold] to switch models.[/dim]")
+        return
 
     if host != "127.0.0.1":
         console.print(f"[bold red]WARNING:[/bold red] Server will bind to {host}, exposing it on the network.")
