@@ -57,7 +57,7 @@ def start_server(config: ServerConfig, dry_run: bool = False) -> Optional[Server
 
     _save_state(state)
 
-    if not _wait_for_health(config.host, config.port, timeout=30):
+    if not _wait_for_health(config.host, config.port, timeout=60):
         stop_server()
         raise RuntimeError(f"Server failed to start within 30s. Check log: {log_path}")
 

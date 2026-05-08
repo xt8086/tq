@@ -177,7 +177,7 @@ def cmd_serve(args):
         extra_flags=extra_flags,
         api_key=api_key,
         idle_timeout=idle_timeout,
-        mmproj_path=meta.mmproj_path if meta.is_multimodal else None,
+        mmproj_path=meta.mmproj_path if (meta.is_multimodal and not args.no_mmproj) else None,
     )
 
     try:
@@ -452,6 +452,7 @@ def main():
 
     sv = sub.add_parser("serve", help="Launch llama-server with optimal TQ settings")
     sv.add_argument("model", nargs="?", default="", help="Model name, path, or list number")
+    sv.add_argument("--no-mmproj", action="store_true", help="Skip multimodal projector even if detected")
     sv.add_argument("-p", "--port", type=int, help="Port (default: 8080)")
     sv.add_argument("--host", default=None, help="Bind address (default: 127.0.0.1)")
     sv.add_argument("-c", "--context", type=int, help="Context length override")
