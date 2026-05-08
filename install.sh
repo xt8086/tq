@@ -43,7 +43,7 @@ info "Creating virtual environment..."
 python3 -m venv "$TQ_VENV"
 
 info "Installing tq package..."
-"$TQ_VENV/bin/pip" install -q tq-serve
+"$TQ_VENV/bin/pip" install -q "tq-serve[chat]"
 
 info "Installing TurboQuant+ llama-server binary..."
 "$TQ_BIN" install
@@ -83,4 +83,5 @@ echo "    tq list            # List local GGUF models"
 echo "    tq search <query>  # Search HuggingFace"
 echo "    tq download <id>   # Download a model"
 echo "    tq serve 1         # Launch with auto-configured TurboQuant"
+echo "    tq chat            # Interactive coding agent (local AI)"
 echo ""
