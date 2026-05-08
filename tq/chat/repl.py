@@ -43,7 +43,7 @@ class ChatSession:
         self.tools = ToolRegistry(self.workdir, self.perms)
         self.auto_started_server = False
         self.cancel_event = threading.Event()
-        self.tools_enabled = True
+        self.use_tool_role = True
 
     def start(self):
         if not self.client.is_available():
@@ -129,7 +129,7 @@ class ChatSession:
                 for chunk in self.client.stream_chat(
                     self.messages,
                     model=self.model,
-                    tools=self.tools.get_tool_definitions() if self.tools_enabled else None,
+                    tools=self.tools.get_tool_definitions(),
                 ):
                     if self.cancel_event.is_set():
                         break
@@ -172,16 +172,15 @@ class ChatSession:
             except Exception as e:
                 print(flush=True)
                 err_str = str(e)
-                if "500" in err_str and self.tools_enabled:
-                    render_error("Server error — disabling tools (model may not support function calling)")
-                    self.tools_enabled = False
-                    bad_tool_msgs = [m for m in self.messages if m.role == "tool"]
-                    for m in bad_tool_msgs:
+                if "500" in err_str and self.use_tool_role:
+                    self.use_tool_role = False
+                    tool_msgs = [m for m in self.messages if m.role == "tool"]
+                    for m in tool_msgs:
                         self.messages.remove(m)
-                    self.messages.append(ChatMessage(
-                        role="user",
-                        content="[Tool use failed. Continuing without tools. Please respond as text only.]",
-                    ))
+                    last_assistant = [m for m in self.messages if m.role == "assistant" and m.tool_calls]
+                    for m in last_assistant:
+                        self.messages.remove(m)
+                    render_info("Model doesn't support tool role — retrying with inline tool results")
                     continue
                 render_error(f"Request failed: {e}")
                 break
@@ -196,32 +195,28 @@ class ChatSession:
 
             self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
 
-            has_errors = False
+            tool_results = []
             for tc in tool_calls:
                 args = tc.parsed_args()
                 render_tool_call(tc.name, args)
                 result = self.tools.execute(tc)
                 render_tool_result(tc.name, result.output, result.error)
 
+                if self.use_tool_role:
+                    self.messages.append(ChatMessage(
+                        role="tool",
+                        content=result.output,
+                        tool_call_id=tc.id,
+                        name=tc.name,
+                    ))
+                else:
+                    tool_results.append(f"Tool {tc.name} result: {result.output}")
+
+            if not self.use_tool_role and tool_results:
                 self.messages.append(ChatMessage(
-                    role="tool",
-                    content=result.output,
-                    tool_call_id=tc.id,
-                    name=tc.name,
+                    role="user",
+                    content="\n\n".join(tool_results),
                 ))
-
-                if result.error:
-                    has_errors = True
-
-            if has_errors:
-                if self.tools_enabled:
-                    self.tools_enabled = False
-                    bad_tool_msgs = [m for m in self.messages if m.role == "tool"]
-                    for m in bad_tool_msgs:
-                        self.messages.remove(m)
-                    render_info("Tool errors detected — continuing without tools")
-                    continue
-                break
 
         token_count = sum(len(m.content) for m in self.messages) // 4
         print(f"  [dim]{token_count:,} tokens in context[/dim]", flush=True)
@@ -335,7 +330,7 @@ class ChatSession:
 
         msg_count = len(self.messages)
         token_est = sum(len(m.content) for m in self.messages) // 4
-        tools_status = "enabled" if self.tools_enabled else "disabled (model doesn't support tool calling)"
+        tools_status = f"enabled (tool_role={'native' if self.use_tool_role else 'inline'})"
         console.print(f"  Messages: {msg_count}, ~{token_est:,} tokens")
         console.print(f"  Tools: {tools_status}")
 
