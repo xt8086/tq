@@ -72,6 +72,67 @@ def load_pdf_as_images(path: str) -> list[str]:
         return []
 
 
+def load_docx_as_text(path: str) -> Optional[str]:
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+        with zipfile.ZipFile(path) as z:
+            with z.open("word/document.xml") as f:
+                tree = ET.parse(f)
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        paragraphs = []
+        for p in tree.findall(".//w:p", ns):
+            texts = [t.text for t in p.findall(".//w:t", ns) if t.text]
+            if texts:
+                paragraphs.append("".join(texts))
+        return "\n".join(paragraphs) if paragraphs else None
+    except Exception:
+        return None
+
+
+def load_xlsx_as_text(path: str) -> Optional[str]:
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+        rows = []
+        with zipfile.ZipFile(path) as z:
+            shared = {}
+            if "xl/sharedStrings.xml" in z.namelist():
+                with z.open("xl/sharedStrings.xml") as f:
+                    stree = ET.parse(f)
+                ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+                for i, si in enumerate(stree.findall(".//s:si", ns)):
+                    texts = [t.text for t in si.findall(".//s:t", ns) if t.text]
+                    shared[i] = "".join(texts)
+            sheet_paths = [n for n in sorted(z.namelist()) if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")]
+            for sp in sheet_paths:
+                with z.open(sp) as f:
+                    sheet = ET.parse(f)
+                ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+                for row in sheet.findall(".//s:row", ns):
+                    cells = []
+                    for cell in row.findall("s:c", ns):
+                        v = cell.find("s:v", ns)
+                        t_attr = cell.get("t", "")
+                        val = v.text if v is not None else ""
+                        if t_attr == "s" and val.isdigit():
+                            val = shared.get(int(val), val)
+                        cells.append(val)
+                    rows.append("\t".join(cells))
+                rows.append("")
+        return "\n".join(rows) if rows else None
+    except Exception:
+        return None
+
+
+def load_csv_as_text(path: str) -> Optional[str]:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read(50000)
+    except Exception:
+        return None
+
+
 @dataclass
 class StreamChunk:
     delta_content: str = ""

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .client import ChatClient, ChatMessage, ToolCall, load_image_as_base64, load_pdf_as_images
+from .client import ChatClient, ChatMessage, ToolCall, load_image_as_base64, load_pdf_as_images, load_docx_as_text, load_xlsx_as_text, load_csv_as_text
 from .tools import ToolRegistry, ToolResult
 from .permissions import PermissionConfig, PermissionAction
 from .render import (
@@ -355,23 +355,66 @@ class ChatSession:
     def _attach_files(self, text: str, msg: ChatMessage) -> ChatMessage:
         import re as _re
         image_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+        text_doc_exts = {".docx", ".xlsx", ".xls", ".csv", ".tsv", ".txt", ".md", ".json", ".xml", ".yaml", ".yml", ".log", ".py", ".js", ".ts", ".html", ".css"}
         paths = _re.findall(r'(?:[\w./~-]+/[\w.-]+\.\w+|~/[\w./-]+\.\w+)', text)
         for raw_path in paths:
             expanded = os.path.expanduser(raw_path)
             if not os.path.isfile(expanded):
                 continue
             ext = os.path.splitext(expanded)[1].lower()
+            size_mb = os.path.getsize(expanded) / (1024 * 1024)
             if ext == ".pdf":
-                images = load_pdf_as_images(expanded)
-                if images:
-                    msg.images.extend(images)
-                    console.print(f"  [dim]📎 Attached PDF: {raw_path} ({len(images)} page(s))[/dim]")
+                if self._is_multimodal():
+                    images = load_pdf_as_images(expanded)
+                    if images:
+                        msg.images.extend(images)
+                        console.print(f"  [dim]Attached PDF: {raw_path} ({len(images)} page(s))[/dim]")
+                text_content = self._extract_pdf_text(expanded)
+                if text_content:
+                    msg.content += f"\n\n[File content: {raw_path}]\n{text_content[:30000]}"
             elif ext in image_exts:
-                img = load_image_as_base64(expanded)
-                if img:
-                    msg.images.append(img)
-                    console.print(f"  [dim]📎 Attached image: {raw_path}[/dim]")
+                if self._is_multimodal():
+                    img = load_image_as_base64(expanded)
+                    if img:
+                        msg.images.append(img)
+                        console.print(f"  [dim]Attached image: {raw_path}[/dim]")
+            elif ext == ".docx":
+                content = load_docx_as_text(expanded)
+                if content:
+                    msg.content += f"\n\n[File content: {raw_path}]\n{content[:30000]}"
+                    console.print(f"  [dim]Attached doc: {raw_path}[/dim]")
+            elif ext in (".xlsx", ".xls"):
+                content = load_xlsx_as_text(expanded)
+                if content:
+                    msg.content += f"\n\n[File content: {raw_path}]\n{content[:30000]}"
+                    console.print(f"  [dim]Attached spreadsheet: {raw_path}[/dim]")
+            elif ext in (".csv", ".tsv"):
+                content = load_csv_as_text(expanded)
+                if content:
+                    msg.content += f"\n\n[File content: {raw_path}]\n{content[:30000]}"
+                    console.print(f"  [dim]Attached CSV: {raw_path}[/dim]")
+            elif ext in text_doc_exts and size_mb < 1:
+                try:
+                    with open(expanded, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read(30000)
+                    msg.content += f"\n\n[File content: {raw_path}]\n{content}"
+                    console.print(f"  [dim]Attached file: {raw_path}[/dim]")
+                except Exception:
+                    pass
         return msg
+
+    def _extract_pdf_text(self, path: str) -> Optional[str]:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["pdftotext", path, "-"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()[:30000]
+        except Exception:
+            pass
+        return None
 
     def _handle_command(self, cmd: str) -> bool:
         parts = cmd.split(maxsplit=1)
