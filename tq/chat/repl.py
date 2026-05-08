@@ -9,7 +9,7 @@ from .render import (
     console, render_markdown, render_streaming, render_tool_call,
     render_tool_result, render_status, render_error, render_info, render_divider,
 )
-from ..server import get_server_status
+from ..server import get_server_status, load_state
 from ..scanner import scan_models, resolve_model_path
 from ..parser import build_model_metadata
 from ..hardware import detect_hardware
