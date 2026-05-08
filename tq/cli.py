@@ -144,12 +144,15 @@ def cmd_serve(args):
 
     rec = recommend(meta, hw, context_length=ctx)
 
+    tool_label = meta.tool_support.value if meta.tool_support.value != "none" else "No (code block mode)"
+
     console.print(Panel(
         f"[bold]Model:[/bold]  {meta.display_name}\n"
         f"[bold]Size:[/bold]    {meta.size_gb:.1f} GB\n"
         f"[bold]Quant:[/bold]   {meta.quant_type.value}\n"
         f"[bold]Hardware:[/bold] {hw.gpu_name} ({hw.ram_gb:.0f} GB)\n"
         + (f"[bold]Multimodal:[/bold] Yes (mmproj detected)\n" if meta.is_multimodal else "")
+        + f"[bold]Tool calling:[/bold] {tool_label}\n"
         + f"\n[bold]TQ Config:[/bold]\n"
         f"  ctk = {rec.cache_type_k.value}\n"
         f"  ctv = {rec.cache_type_v.value}\n"
@@ -178,6 +181,7 @@ def cmd_serve(args):
         api_key=api_key,
         idle_timeout=idle_timeout,
         mmproj_path=meta.mmproj_path if (meta.is_multimodal and not args.no_mmproj) else None,
+        tool_support=meta.tool_support.value,
     )
 
     try:

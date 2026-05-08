@@ -74,27 +74,32 @@ class ChatSession:
             render_info("Run 'tq serve' first to start a model server, then 'tq chat'")
             return
 
+        state = load_state()
+        tool_support = state.tool_support if state else "none"
+
         models = self.client.list_models()
         if models:
             self.model = self.model or models[0].get("id", "")
-        else:
-            state = load_state()
-            if state:
-                self.model = os.path.basename(state.model_path)
+        elif state:
+            self.model = os.path.basename(state.model_path)
 
         if not self.model:
             render_error("No model available")
             return
 
+        if tool_support == "none":
+            self.tools_disabled = True
+
         if self.system_prompt:
             self.messages.append(ChatMessage(role="system", content=self.system_prompt))
         else:
-            self.messages.append(ChatMessage(
-                role="system",
-                content=self._default_system_prompt(),
-            ))
+            prompt = self._default_system_prompt()
+            if self.tools_disabled:
+                prompt += self._code_block_system_addendum()
+            self.messages.append(ChatMessage(role="system", content=prompt))
 
-        render_status(self.model, self.base_url)
+        mode_label = "code blocks" if self.tools_disabled else "tool calling"
+        render_status(self.model, self.base_url, f"Mode: {mode_label}")
         render_info("Type /help for commands. Ctrl+C to cancel, Ctrl+D to quit.")
         render_divider()
 

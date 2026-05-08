@@ -3,7 +3,7 @@ from __future__ import annotations
 import struct
 from typing import Optional
 
-from .types import ModelMetadata, QuantType
+from .types import ModelMetadata, QuantType, ToolSupport
 
 GGUF_MAGIC = 0x46554747
 GGUF_VERSION_3 = 3
@@ -264,6 +264,7 @@ def build_model_metadata(path: str, raw_metadata: Optional[dict] = None) -> Mode
         expert_count=expert_count,
         chat_template=chat_template,
         gguf_metadata=raw_metadata,
+        tool_support=_detect_tool_support(arch, chat_template, name),
     )
 
 
@@ -303,3 +304,45 @@ def _detect_quant_type(path: str, metadata: dict) -> QuantType:
         return ft_map.get(file_type, QuantType.UNKNOWN)
 
     return QuantType.UNKNOWN
+
+
+_TOOL_CAPABLE_ARCHES = {
+    "gemma2", "gemma3", "gemma",
+    "qwen2", "qwen3",
+    "llama", "llama3", "llama4",
+    "mistral", "mixtral",
+    "phi3", "phi4",
+    "command-r",
+    "chatglm", "glm4",
+    "deepseek2", "deepseek3",
+    "claude",
+}
+
+_SMALL_MODEL_PATTERNS = (
+    "ministral",
+    "gemma-2-2b", "gemma-2-1b",
+    "phi-1",
+    "smollm",
+    "tinyllama",
+    "qwen2-0.5b", "qwen2-1.5b",
+    "qwen3-0.6b", "qwen3-1.7b",
+)
+
+
+def _detect_tool_support(arch: Optional[str], chat_template: Optional[str], model_name: str) -> ToolSupport:
+    template = chat_template or ""
+    has_template_tools = "tool_calls" in template and ("function" in template or "tool_call" in template.lower())
+
+    name_lower = model_name.lower().replace("_", " ").replace("-", " ")
+    is_small = any(p.replace("-", " ") in name_lower for p in _SMALL_MODEL_PATTERNS)
+
+    if is_small:
+        return ToolSupport.NONE
+
+    if has_template_tools:
+        return ToolSupport.OPENAI
+
+    if arch and arch.lower() in _TOOL_CAPABLE_ARCHES:
+        return ToolSupport.OPENAI
+
+    return ToolSupport.NONE

@@ -40,6 +40,11 @@ class CacheType(enum.Enum):
     F16 = "f16"
 
 
+class ToolSupport(enum.Enum):
+    OPENAI = "openai"
+    NONE = "none"
+
+
 @dataclass
 class ModelMetadata:
     name: str
@@ -59,6 +64,7 @@ class ModelMetadata:
     gguf_metadata: dict = field(default_factory=dict)
     mmproj_path: Optional[str] = None
     is_multimodal: bool = False
+    tool_support: ToolSupport = ToolSupport.NONE
 
     @property
     def size_gb(self) -> float:
@@ -123,6 +129,7 @@ class ServerConfig:
     api_key: Optional[str] = None
     idle_timeout: int = 300
     mmproj_path: Optional[str] = None
+    tool_support: str = "none"
 
     def to_command(self, binary_path: str) -> list[str]:
         cmd = [binary_path, "-m", self.model_path, "--port", str(self.port), "--host", self.host]
@@ -146,3 +153,4 @@ class ServerState:
     session_token: str
     started_at: float
     idle_timeout: int = 300
+    tool_support: str = "none"
