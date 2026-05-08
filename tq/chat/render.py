@@ -31,16 +31,17 @@ def render_tool_call(name: str, args: dict):
     arg_str = " ".join(f"{k}={v}" for k, v in args.items())
     if len(arg_str) > 120:
         arg_str = arg_str[:117] + "..."
-    console.print(f"  [dim]→ {name}({arg_str})[/dim]")
+    console.print(f"  [cyan]→ {name}({arg_str})[/cyan]")
 
 
 def render_tool_result(name: str, result: str, error: bool = False):
-    color = "red" if error else "dim"
-    prefix = "✗" if error else "←"
-    preview = result[:200].replace("", "")
-    if len(result) > 200:
-        preview += "..."
-    console.print(f"  [{color}]{prefix} {name}: {preview}[/{color}]")
+    if error:
+        console.print(f"  [bold red]✗ {name}:[/bold red] {result}")
+    else:
+        preview = result[:300]
+        if len(result) > 300:
+            preview += "..."
+        console.print(f"  [dim]← {name}:[/dim] {preview}")
 
 
 def render_status(model: str, base_url: str, context_info: str = ""):
