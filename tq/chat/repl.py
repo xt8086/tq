@@ -45,7 +45,6 @@ class ChatSession:
         self.cancel_event = threading.Event()
         self.use_tool_role = True
         self.tools_enabled = True
-        self.consecutive_tool_failures = 0
 
     def start(self):
         if not self.client.is_available():
@@ -120,7 +119,8 @@ class ChatSession:
 
     def _send_and_process(self):
         max_iterations = 20
-        for _ in range(max_iterations):
+        server_errors = 0
+        for iteration in range(max_iterations):
             response_text = ""
             tool_calls: list[ToolCall] = []
             current_tc: dict = {}
@@ -174,26 +174,25 @@ class ChatSession:
             except Exception as e:
                 print(flush=True)
                 err_str = str(e)
-                if "500" in err_str:
-                    if self.use_tool_role:
-                        self.use_tool_role = False
-                    tool_msgs = [m for m in self.messages if m.role == "tool"]
-                    for m in tool_msgs:
-                        self.messages.remove(m)
-                    assistant_with_tools = [m for m in self.messages if m.role == "assistant" and m.tool_calls]
-                    for m in assistant_with_tools:
-                        self.messages.remove(m)
-                    tool_names = set()
-                    for m in assistant_with_tools:
-                        for tc in m.tool_calls:
-                            tool_names.add(tc.name)
-                    if tool_names:
-                        self.messages.append(ChatMessage(
-                            role="assistant",
-                            content=f"[I attempted to call tool(s): {', '.join(tool_names)} but it caused a server error. I should respond with text instead of tool calls.]",
-                        ))
-                    render_info("Tool call caused server error — informing model and retrying")
+                server_errors += 1
+
+                if server_errors > 3:
+                    render_error("Too many server errors — stopping. Try /clear to reset the conversation.")
+                    break
+
+                is_server_error = "500" in err_str or "400" in err_str
+
+                if is_server_error:
+                    self._strip_tool_messages()
+                    self.tools_enabled = False
+                    self.use_tool_role = False
+                    self.messages.append(ChatMessage(
+                        role="user",
+                        content="[The previous message caused a server error. Tool calling has been disabled. Please respond with text only, do not attempt any tool calls.]",
+                    ))
+                    render_info("Server error — tools disabled, retrying as plain chat")
                     continue
+
                 render_error(f"Request failed: {e}")
                 break
 
@@ -205,56 +204,38 @@ class ChatSession:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
                 break
 
-            if self.use_tool_role:
-                self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
-            else:
-                call_descriptions = []
-                for tc in tool_calls:
-                    call_descriptions.append(f"[Called tool: {tc.name}({tc.arguments})]")
-                self.messages.append(ChatMessage(
-                    role="assistant",
-                    content=(response_text + "\n" + "\n".join(call_descriptions)).strip(),
-                ))
-
-            tool_results = []
-            had_failure = False
-            for tc in tool_calls:
-                args = tc.parsed_args()
-                render_tool_call(tc.name, args)
-                result = self.tools.execute(tc)
-                render_tool_result(tc.name, result.output, result.error)
-
-                if result.error:
-                    had_failure = True
-
+            if self.tools_enabled and tool_calls:
                 if self.use_tool_role:
-                    self.messages.append(ChatMessage(
-                        role="tool",
-                        content=result.output,
-                        tool_call_id=tc.id,
-                        name=tc.name,
-                    ))
+                    self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
                 else:
-                    tool_results.append(f"Tool {tc.name} result: {result.output}")
+                    self.messages.append(ChatMessage(role="assistant", content=response_text))
 
-            if not self.use_tool_role and tool_results:
-                self.messages.append(ChatMessage(
-                    role="user",
-                    content="\n\n".join(tool_results),
-                ))
+                tool_results = []
+                for tc in tool_calls:
+                    args = tc.parsed_args()
+                    render_tool_call(tc.name, args)
+                    result = self.tools.execute(tc)
+                    render_tool_result(tc.name, result.output, result.error)
 
-            if had_failure:
-                self.consecutive_tool_failures += 1
+                    if self.use_tool_role:
+                        self.messages.append(ChatMessage(
+                            role="tool",
+                            content=result.output,
+                            tool_call_id=tc.id,
+                            name=tc.name,
+                        ))
+                    else:
+                        tool_results.append(f"Tool {tc.name} result: {result.output}")
+
+                if not self.use_tool_role and tool_results:
+                    self.messages.append(ChatMessage(
+                        role="user",
+                        content="\n\n".join(tool_results),
+                    ))
+            elif response_text:
+                self.messages.append(ChatMessage(role="assistant", content=response_text))
+                break
             else:
-                self.consecutive_tool_failures = 0
-
-            if self.consecutive_tool_failures >= 3 and self.tools_enabled:
-                self.tools_enabled = False
-                render_info("This model doesn't support tool calling — tools disabled for this session")
-                self.messages.append(ChatMessage(
-                    role="user",
-                    content="[Tool calls kept failing. Stop trying to call tools. Respond with text only.]",
-                ))
                 break
 
         token_count = sum(len(m.content) for m in self.messages) // 4
@@ -485,6 +466,12 @@ class ChatSession:
                 render_info("Auto-started server stopped")
             except Exception:
                 pass
+
+    def _strip_tool_messages(self):
+        self.messages = [
+            m for m in self.messages
+            if m.role != "tool" and not (m.role == "assistant" and m.tool_calls)
+        ]
 
     def _default_system_prompt(self) -> str:
         return (
