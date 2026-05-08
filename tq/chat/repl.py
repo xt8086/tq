@@ -7,7 +7,7 @@ from .render import (
     console, render_markdown, render_streaming, render_tool_call,
     render_tool_result, render_status, render_error, render_info, render_divider,
 )
-from ..server import start_server, get_server_status, load_state
+from ..server import get_server_status
 from ..scanner import scan_models, resolve_model_path
 from ..parser import build_model_metadata
 from ..hardware import detect_hardware
@@ -16,10 +16,8 @@ from .. import config as cfg
 from ..types import ServerConfig
 
 import os
-import signal
 import sys
 import threading
-import time
 
 
 class ChatSession:
@@ -28,7 +26,6 @@ class ChatSession:
         base_url: str = "http://127.0.0.1:8080",
         model: str = "",
         workdir: str = "",
-        no_serve: bool = False,
         system_prompt: str = "",
         perms: PermissionConfig | None = None,
     ):
@@ -36,22 +33,17 @@ class ChatSession:
         self.base_url = base_url
         self.model = model
         self.workdir = os.path.abspath(workdir or os.getcwd())
-        self.no_serve = no_serve
         self.system_prompt = system_prompt
         self.perms = perms or PermissionConfig.defaults()
         self.messages: list[ChatMessage] = []
         self.tools = ToolRegistry(self.workdir, self.perms)
-        self.auto_started_server = False
         self.cancel_event = threading.Event()
 
     def start(self):
         if not self.client.is_available():
-            if self.no_serve:
-                render_error(f"Cannot connect to server at {self.base_url}")
-                render_info("Run 'tq serve' first, or remove --no-serve")
-                return
-            if not self._auto_start_server():
-                return
+            render_error(f"No server running at {self.base_url}")
+            render_info("Run 'tq serve' first to start a model server, then 'tq chat'")
+            return
 
         models = self.client.list_models()
         if models:
@@ -100,7 +92,6 @@ class ChatSession:
                     user_input = input("  You: ").strip()
             except (EOFError, KeyboardInterrupt):
                 print()
-                self._cleanup()
                 break
 
             if not user_input:
@@ -205,7 +196,6 @@ class ChatSession:
         arg = parts[1] if len(parts) > 1 else ""
 
         if command in ("/quit", "/exit", "/q"):
-            self._cleanup()
             return True
         elif command == "/help":
             self._cmd_help()
@@ -352,76 +342,6 @@ class ChatSession:
             user_msg = self.messages.pop()
             self.messages.append(user_msg)
             self._send_and_process()
-
-    def _auto_start_server(self) -> bool:
-        model_dir = cfg.get_model_dir()
-        models = scan_models(model_dir, system_wide=True)
-
-        if not models:
-            render_error("No models found. Run 'tq download <model>' first.")
-            return False
-
-        if len(models) == 1:
-            model_choice = "1"
-        else:
-            console.print("  [bold]Available models:[/bold]")
-            for i, m in enumerate(models, 1):
-                console.print(f"    {i}. {m.display_name} ({m.size_gb:.1f}G)")
-            try:
-                model_choice = input("  Serve which model? [number]: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                return False
-
-        model_path = resolve_model_path(model_dir, model_choice)
-        if not model_path:
-            render_error(f"Model not found: {model_choice}")
-            return False
-
-        try:
-            meta = build_model_metadata(model_path)
-        except Exception:
-            from .types import ModelMetadata
-            meta = ModelMetadata(name=os.path.basename(model_path), path=model_path, size_bytes=os.path.getsize(model_path))
-
-        hw = detect_hardware()
-        rec = recommend(meta, hw)
-        port = cfg.get_port()
-        host = cfg.get_host()
-
-        server_config = ServerConfig(
-            model_path=model_path,
-            port=port,
-            host=host,
-            tq=rec,
-            idle_timeout=cfg.load_config().get("idle_timeout", 300),
-            mmproj_path=meta.mmproj_path if meta.is_multimodal else None,
-        )
-
-        console.print("  [dim]Starting tq serve...[/dim]")
-
-        try:
-            state = start_server(server_config)
-            if state:
-                self.auto_started_server = True
-                render_info(f"Server started (PID: {state.pid})")
-                time.sleep(1)
-                return True
-        except Exception as e:
-            render_error(f"Failed to start server: {e}")
-            return False
-
-        return False
-
-    def _cleanup(self):
-        render_info("Session ended")
-        if self.auto_started_server:
-            from ..server import stop_server
-            try:
-                stop_server()
-                render_info("Auto-started server stopped")
-            except Exception:
-                pass
 
     def _default_system_prompt(self) -> str:
         return (

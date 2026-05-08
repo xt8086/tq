@@ -107,17 +107,14 @@ def cmd_serve(args):
             console.print("[dim]No GGUF models found.[/dim]")
             console.print("[dim]Use 'tq download <model>' to fetch one.[/dim]")
             sys.exit(1)
-        if len(models) == 1:
-            model_arg = "1"
-        else:
-            for i, m in enumerate(models, 1):
-                mm = " [bold green]multimodal[/]" if m.is_multimodal else ""
-                console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G){mm}")
-            try:
-                model_arg = input("  Serve which model? [number]: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                sys.exit(0)
+        for i, m in enumerate(models, 1):
+            mm = " [bold green]multimodal[/]" if m.is_multimodal else ""
+            console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G){mm}")
+        try:
+            model_arg = input("  Serve which model? [number]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            sys.exit(0)
 
     model_path = resolve_model_path(model_dir, model_arg)
     if not model_path:
@@ -400,7 +397,6 @@ def cmd_chat(args):
         base_url=base_url,
         model=args.model or "",
         workdir=args.workdir or os.getcwd(),
-        no_serve=args.no_serve,
         system_prompt=args.system or "",
         perms=perms,
     )
@@ -489,7 +485,6 @@ def main():
     ch.add_argument("-p", "--port", type=int, default=8080, help="Server port")
     ch.add_argument("--host", default="127.0.0.1", help="Server host")
     ch.add_argument("-w", "--workdir", help="Working directory (default: cwd)")
-    ch.add_argument("--no-serve", action="store_true", help="Don't auto-start server")
     ch.add_argument("-s", "--system", help="Custom system prompt")
     ch.add_argument("--yolo", action="store_true", help="Allow all tool actions without asking")
     ch.add_argument("--ask-all", action="store_true", help="Ask permission for all actions")
