@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .client import ChatClient, ChatMessage, ToolCall
 from .tools import ToolRegistry, ToolResult
 from .permissions import PermissionConfig, PermissionAction
@@ -16,8 +18,34 @@ from .. import config as cfg
 from ..types import ServerConfig
 
 import os
+import subprocess
 import sys
 import threading
+
+
+def extract_python_blocks(text: str) -> list[str]:
+    return re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
+
+
+def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=workdir,
+        )
+        output = result.stdout
+        if result.stderr:
+            output += ("\n" if output else "") + result.stderr
+        if result.returncode != 0 and not result.stderr:
+            output += f"\n[exit code: {result.returncode}]"
+        return output.strip(), result.returncode != 0
+    except subprocess.TimeoutExpired:
+        return "Execution timed out", True
+    except Exception as e:
+        return str(e), True
 
 
 class ChatSession:
@@ -177,6 +205,8 @@ class ChatSession:
             if not tool_calls:
                 if response_text:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
+                    if self.tools_disabled:
+                        self._process_code_blocks(response_text)
                 break
 
             empty_args = []
@@ -192,7 +222,9 @@ class ChatSession:
                 render_error(f"{', '.join(empty_args)}() called with no/empty arguments — model may not support tool calling")
                 if not self.tools_disabled:
                     self.tools_disabled = True
-                    render_info("Tools disabled for this session — model will chat without tools")
+                    render_info("Tools disabled for this session — switching to code block execution mode")
+                    if self.messages and self.messages[0].role == "system":
+                        self.messages[0].content += self._code_block_system_addendum()
 
             if not valid_tool_calls:
                 if response_text:
@@ -219,6 +251,65 @@ class ChatSession:
 
         token_count = sum(len(m.content) for m in self.messages) // 4
         console.print(f"  [dim]{token_count:,} tokens in context[/dim]")
+
+    def _process_code_blocks(self, text: str):
+        blocks = extract_python_blocks(text)
+        if not blocks:
+            return
+
+        for code in blocks:
+            preview = code.strip().split("\n")[0][:80]
+            console.print(f"  [cyan]→ python: {preview}[/cyan]")
+
+            action = self.perms.get_action("bash", code, self.workdir)
+            if action == PermissionAction.ASK:
+                action = ask_permission("python", code.strip()[:200])
+
+            if action == PermissionAction.DENY:
+                console.print("  [dim]⊘ Skipped (denied)[/dim]")
+                self.messages.append(ChatMessage(
+                    role="user",
+                    content="[Code execution was denied by user]",
+                ))
+                continue
+
+            output, is_error = execute_python_code(code, self.workdir)
+            if output:
+                preview_out = output[:300] + ("..." if len(output) > 300 else "")
+                if is_error:
+                    console.print(f"  [bold red]✗ python:[/bold red] {preview_out}")
+                else:
+                    console.print(f"  [dim]← {preview_out}[/dim]")
+
+            self.messages.append(ChatMessage(
+                role="user",
+                content=f"[Code output]: {output}" + (" (ERROR)" if is_error else ""),
+            ))
+
+            self.cancel_event.clear()
+            self._send_and_process_no_tools()
+            break
+
+    def _send_and_process_no_tools(self):
+        try:
+            response_text = ""
+            for chunk in self.client.stream_chat(
+                self.messages,
+                model=self.model,
+                tools=None,
+            ):
+                if self.cancel_event.is_set():
+                    break
+                if chunk.delta_content:
+                    response_text += chunk.delta_content
+                    print(chunk.delta_content, end="", flush=True)
+            print(flush=True)
+            if response_text:
+                self.messages.append(ChatMessage(role="assistant", content=response_text))
+                self._process_code_blocks(response_text)
+        except Exception as e:
+            print(flush=True)
+            render_error(f"Request failed: {e}")
 
     def _send_without_tools(self):
         try:
@@ -399,5 +490,18 @@ class ChatSession:
             "Be concise and direct. Use tools when needed to accomplish tasks. "
             "If a tool call fails or returns an error, report the error to the user and move on. "
             "Do not retry failed tool calls. "
+            f"Working directory: {self.workdir}"
+        )
+
+    def _code_block_system_addendum(self) -> str:
+        return (
+            "\n\nIMPORTANT: You do NOT have access to tool-calling. "
+            "Instead, when you need to execute commands or perform actions, "
+            "write Python code inside ```python code blocks. "
+            "Your code will be automatically extracted and executed, and the output will be fed back to you. "
+            "You can use subprocess.run() for shell commands, os for file operations, "
+            "and any standard library module. Always print your results. "
+            "Only write code you actually need executed — do not write example or illustrative code blocks. "
+            "For shell commands, prefer: subprocess.run(['cmd', 'arg'], capture_output=True, text=True). "
             f"Working directory: {self.workdir}"
         )
