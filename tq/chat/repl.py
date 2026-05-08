@@ -188,7 +188,7 @@ class ChatSession:
                 ))
 
         token_count = sum(len(m.content) for m in self.messages) // 4
-        print(f"  [dim]{token_count:,} tokens in context[/dim]", flush=True)
+        console.print(f"  [dim]{token_count:,} tokens in context[/dim]")
 
     def _handle_command(self, cmd: str) -> bool:
         parts = cmd.split(maxsplit=1)
