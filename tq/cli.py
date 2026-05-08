@@ -100,7 +100,26 @@ def cmd_serve(args):
     host = args.host or cfg.get_host()
     binary_path = cfg.get_binary_path()
 
-    model_path = resolve_model_path(model_dir, args.model)
+    model_arg = args.model
+    if not model_arg:
+        models = scan_models(model_dir, system_wide=True)
+        if not models:
+            console.print("[dim]No GGUF models found.[/dim]")
+            console.print("[dim]Use 'tq download <model>' to fetch one.[/dim]")
+            sys.exit(1)
+        if len(models) == 1:
+            model_arg = "1"
+        else:
+            for i, m in enumerate(models, 1):
+                mm = " [bold green]multimodal[/]" if m.is_multimodal else ""
+                console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G){mm}")
+            try:
+                model_arg = input("  Serve which model? [number]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                sys.exit(0)
+
+    model_path = resolve_model_path(model_dir, model_arg)
     if not model_path:
         console.print(f"[red]Model not found:[/red] {args.model}")
         console.print(f"[dim]Searched in: {model_dir}[/dim]")
@@ -436,7 +455,7 @@ def main():
     dl.add_argument("--skip-verify", action="store_true", help="Skip SHA256 verification")
 
     sv = sub.add_parser("serve", help="Launch llama-server with optimal TQ settings")
-    sv.add_argument("model", help="Model name or path")
+    sv.add_argument("model", nargs="?", default="", help="Model name, path, or list number")
     sv.add_argument("-p", "--port", type=int, help="Port (default: 8080)")
     sv.add_argument("--host", default=None, help="Bind address (default: 127.0.0.1)")
     sv.add_argument("-c", "--context", type=int, help="Context length override")
