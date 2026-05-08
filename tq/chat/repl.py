@@ -37,6 +37,7 @@ class ChatSession:
         self.perms = perms or PermissionConfig.defaults()
         self.messages: list[ChatMessage] = []
         self.tools = ToolRegistry(self.workdir, self.perms)
+        self.tools_disabled = False
         self.cancel_event = threading.Event()
 
     def start(self):
@@ -119,7 +120,7 @@ class ChatSession:
                 for chunk in self.client.stream_chat(
                     self.messages,
                     model=self.model,
-                    tools=self.tools.get_tool_definitions(),
+                    tools=None if self.tools_disabled else self.tools.get_tool_definitions(),
                 ):
                     if self.cancel_event.is_set():
                         break
@@ -172,19 +173,35 @@ class ChatSession:
                     self.messages.append(ChatMessage(role="assistant", content=response_text))
                 break
 
-            self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=tool_calls))
-
+            valid_tool_calls = []
             for tc in tool_calls:
+                args = tc.parsed_args()
+                if not args and not tc.arguments.strip():
+                    render_error(f"{tc.name}() called with no arguments — disabling tools for this model")
+                    self.tools_disabled = True
+                    response_text += f"\n[Tool {tc.name}() was called with no arguments and skipped.]"
+                    continue
+                valid_tool_calls.append(tc)
+
+            if not valid_tool_calls:
+                if response_text:
+                    self.messages.append(ChatMessage(role="assistant", content=response_text))
+                break
+
+            self.messages.append(ChatMessage(role="assistant", content=response_text, tool_calls=valid_tool_calls))
+
+            tool_results = []
+            for tc in valid_tool_calls:
                 args = tc.parsed_args()
                 render_tool_call(tc.name, args)
                 result = self.tools.execute(tc)
                 render_tool_result(tc.name, result.output, result.error)
+                tool_results.append((tc, result))
 
+            for tc, result in tool_results:
                 self.messages.append(ChatMessage(
-                    role="tool",
-                    content=result.output,
-                    tool_call_id=tc.id,
-                    name=tc.name,
+                    role="user",
+                    content=f"[Tool result for {tc.name}]: {result.output}" + (" (ERROR)" if result.error else ""),
                 ))
 
         token_count = sum(len(m.content) for m in self.messages) // 4
