@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wondermotor AI — Local AI Tools</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #262626;
+    --text: #e5e5e5;
+    --dim: #737373;
+    --accent: #22c55e;
+    --accent-dim: #16a34a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 60px 24px;
+  }
+  .brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .brand span { color: var(--accent); }
+  .brand-sub {
+    font-size: 0.9rem;
+    color: var(--dim);
+    margin-bottom: 48px;
+  }
+  .tool-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+  .tool-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .tool-name {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .tool-name span { color: var(--accent); }
+  .tool-badge {
+    background: var(--accent);
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tool-tagline {
+    font-size: 1.1rem;
+    color: var(--dim);
+    margin-bottom: 28px;
+  }
+  .install-section {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 28px;
+  }
+  .install-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .code-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .code-box {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.9rem;
+    color: #d4d4d4;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .code-box .prompt { color: var(--accent); }
+  .copy-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { background: var(--accent-dim); }
+  .copy-btn.copied { background: #15803d; }
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .feature {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .feature h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent);
+  }
+  .feature p {
+    font-size: 0.8rem;
+    color: var(--dim);
+    line-height: 1.4;
+  }
+  .comparison {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .comparison th, .comparison td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .comparison th {
+    color: var(--dim);
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .comparison td:last-child { color: var(--accent); font-weight: 600; }
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    margin: 16px 0;
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 10px 0 10px 44px;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 10px;
+    background: var(--accent);
+    color: #000;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+  }
+  .steps code {
+    background: #000;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    color: #d4d4d4;
+  }
+  .cmd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  .cmd-table th, .cmd-table td {
+    text-align: left;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmd-table th {
+    color: var(--dim);
+    font-weight: 500;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .cmd-table td:last-child { color: var(--dim); }
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    margin-top: 24px;
+  }
+  .coming-soon {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    text-align: center;
+    color: var(--dim);
+  }
+  .coming-soon h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .coming-soon p { font-size: 0.9rem; }
+  .footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--dim);
+    text-align: center;
+  }
+  .footer a { color: var(--dim); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+  @media (max-width: 600px) {
+    .features { grid-template-columns: 1fr; }
+    .code-row { flex-direction: column; }
+    .copy-btn { width: 100%; }
+    .tool-name { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">Wondermotor <span>AI</span></div>
+  <p class="brand-sub">Open tools for running local AI</p>
+
+  <div class="tool-card">
+    <div class="tool-header">
+      <div class="tool-name">t<span>q</span></div>
+      <div class="tool-badge">Available</div>
+    </div>
+    <p class="tool-tagline">TurboQuant model server manager &mdash; run local LLMs with auto-configured KV cache compression</p>
+
+    <div class="install-section">
+      <div class="install-label">Install &mdash; macOS &amp; Linux</div>
+      <div class="code-row">
+        <div class="code-box"><span class="prompt">$</span> curl -fsSL https://wondermotor.com/install.sh | bash</div>
+        <button class="copy-btn" onclick="copyInstall()">Copy</button>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h3>3.8x KV Compression</h3>
+        <p>turbo4 compresses V cache to 4.25 bits &mdash; 8x more context in the same RAM.</p>
+      </div>
+      <div class="feature">
+        <h3>Auto-Config</h3>
+        <p>Detects GPU, RAM, quant type. Calculates optimal cache settings automatically.</p>
+      </div>
+      <div class="feature">
+        <h3>OpenAI-Compatible</h3>
+        <p>/v1/chat/completions. Works with any client &mdash; curl, Pi, LM Studio.</p>
+      </div>
+      <div class="feature">
+        <h3>Idle Auto-Stop</h3>
+        <p>Stops after 5 min idle. Like Ollama &mdash; no wasted resources.</p>
+      </div>
+    </div>
+
+    <div class="section-title">Without vs With tq</div>
+    <table class="comparison">
+      <tr><th></th><th>Without</th><th>With tq</th></tr>
+      <tr><td>8GB RAM, 3B model</td><td>4,096 context</td><td>32,768 context</td></tr>
+      <tr><td>KV cache memory</td><td>f16 (full size)</td><td>3.8&times; compressed</td></tr>
+      <tr><td>Config</td><td>Manual flags</td><td>Auto-detected</td></tr>
+      <tr><td>Idle behavior</td><td>Always running</td><td>Auto-stops</td></tr>
+    </table>
+
+    <div class="section-title">Quick Start</div>
+    <ol class="steps">
+      <li>Install: <code>curl -fsSL https://wondermotor.com/install.sh | bash</code></li>
+      <li>List models: <code>tq list</code></li>
+      <li>Search &amp; download: <code>tq search "qwen2.5 coder 7b"</code> then <code>tq download &lt;model&gt;</code></li>
+      <li>Serve: <code>tq serve 1</code> &mdash; TurboQuant auto-configured.</li>
+    </ol>
+
+    <div class="section-title">Commands</div>
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td><code>tq list</code></td><td>List local GGUF models</td></tr>
+      <tr><td><code>tq search &lt;query&gt;</code></td><td>Search HuggingFace</td></tr>
+      <tr><td><code>tq download &lt;model&gt;</code></td><td>Download with SHA256 verify</td></tr>
+      <tr><td><code>tq serve 1</code></td><td>Launch with auto TQ config</td></tr>
+      <tr><td><code>tq serve 1 --dry-run</code></td><td>Preview command</td></tr>
+      <tr><td><code>tq status</code></td><td>Check running server</td></tr>
+      <tr><td><code>tq stop</code></td><td>Stop the server</td></tr>
+      <tr><td><code>tq logs</code></td><td>View server logs</td></tr>
+      <tr><td><code>tq install</code></td><td>Install TurboQuant+ binary</td></tr>
+      <tr><td><code>tq doctor</code></td><td>Verify setup</td></tr>
+      <tr><td><code>tq config show</code></td><td>Show/edit config</td></tr>
+    </table>
+  </div>
+
+  <div class="coming-soon">
+    <h3>More tools coming soon</h3>
+    <p>Wondermotor AI is building more open tools for local AI. Stay tuned.</p>
+  </div>
+
+  <div class="footer">
+    &copy; Wondermotor AI &middot; Powered by <a href="https://github.com/TheTom/llama-cpp-turboquant">TurboQuant+</a> &middot; <a href="https://wondermotor.com/install.sh">install.sh</a>
+  </div>
+</div>
+<script>
+function copyInstall() {
+  const text = 'curl -fsSL https://wondermotor.com/install.sh | bash';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

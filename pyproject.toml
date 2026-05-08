@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tq-serve"
+version = "0.1.0"
+description = "TurboQuant model server manager — auto-configured llama-server with KV cache compression"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    {name = "Sheng Chiao"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "psutil>=5.9",
+    "huggingface_hub>=0.20",
+    "tomli>=2.0;python_version<'3.11'",
+    "tomli_w>=1.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+tq = "tq.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-mock>=3.0"]
+
+[project.urls]
+Homepage = "https://github.com/shengchiao/tq"
+Repository = "https://github.com/shengchiao/tq"
