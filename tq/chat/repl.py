@@ -27,7 +27,10 @@ def extract_python_blocks(text: str) -> list[str]:
     exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
     if exec_blocks:
         return exec_blocks
-    return re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
+    blocks = re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
+    if blocks:
+        return blocks
+    return re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
 
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
@@ -525,5 +528,11 @@ class ChatSession:
             "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
             "6. NEVER import requests — it is not installed. Use curl via subprocess instead.\n"
             "7. Always print your results so they appear in the output.\n"
+            "\n\nFREE APIs (no key needed, use curl):\n"
+            "- Weather: subprocess.run(['curl', '-s', 'wttr.in/92880?format=3'], capture_output=True, text=True)\n"
+            "- Weather JSON: subprocess.run(['curl', '-s', 'wttr.in/92880?format=j1'], capture_output=True, text=True)\n"
+            "- IP info: subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True)\n"
+            "- Web fetch: subprocess.run(['curl', '-s', '-L', url], capture_output=True, text=True)\n"
+            "- Web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-d', '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1}'], capture_output=True, text=True)\n"
             f"Working directory: {self.workdir}"
         )
