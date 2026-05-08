@@ -24,7 +24,10 @@ import threading
 
 
 def extract_python_blocks(text: str) -> list[str]:
-    return re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
+    exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
+    if exec_blocks:
+        return exec_blocks
+    return re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
 
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
