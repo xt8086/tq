@@ -207,6 +207,7 @@ def cmd_serve(args):
 
     console.print(f"[bold]Starting server on {host}:{port}...[/bold]")
     console.print(f"[dim]Command: {cmd_str}[/dim]")
+    console.print("[dim]Please wait, loading model...[/dim]", highlight=False)
 
     state = start_server(server_config)
 
