@@ -33,7 +33,12 @@ def extract_python_blocks(text: str) -> list[str]:
     return re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
 
 
-_AUTO_IMPORTS = "import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.request\n"
+_AUTO_IMPORTS = """import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.request
+def curl(url,timeout=10):
+ return subprocess.run(['curl','-s',url],capture_output=True,text=True,timeout=timeout).stdout
+def weather(location):
+ r=curl(f'wttr.in/{location}?format=j1');d=json.loads(r);a=d['nearest_area'][0];c=d['current_condition'][0];return {'area':a['areaName'][0]['value'],'region':a['region'][0]['value'],'temp_F':c['temp_F'],'feels_F':c['FeelsLikeF'],'humidity':c['humidity'],'desc':c['weatherDesc'][0]['value'],'wind_mph':c['windspeedMiles']}
+"""
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
     full_code = _AUTO_IMPORTS + code
@@ -618,20 +623,23 @@ class ChatSession:
             "Only write code you actually need executed — do not write example or illustrative code blocks. "
             "\n\nRULES:\n"
             "1. Use ```exec for code you want executed. Use ```python only for examples you do NOT want executed.\n"
-            "2. For shell commands: subprocess.run(['cmd', 'arg'], capture_output=True, text=True)\n"
-            "3. For HTTP requests: use subprocess.run(['curl', '-s', url], capture_output=True, text=True) — this works without any API key or library.\n"
-            "4. For web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
+            "2. For HTTP requests: print(curl(url)) — curl() returns the response text directly, no .stdout needed.\n"
+            "3. For weather: w=weather('92880'); print(w) — returns dict with area, temp_F, desc, humidity, wind_mph.\n"
+            "4. For web search: r=curl('https://mcp.exa.ai/mcp'); then parse the JSON response.\n"
             "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
-            "6. NEVER import requests — it is not installed. Use curl via subprocess instead.\n"
-            "7. NEVER run pip install or install any packages — only use Python standard library and subprocess.\n"
+            "6. NEVER import requests — it is not installed. Use curl() instead.\n"
+            "7. NEVER run pip install or install any packages — only use the pre-imported libraries and curl().\n"
             "8. Always print your results so they appear in the output.\n"
-            "9. NEVER add information that is not in the command output. If curl returns '92880: ☀️ +81°F', report exactly that — do NOT guess city names or add details not present in the output. If you need the city name, use the JSON format API instead.\n"
-            "\n\nFREE APIs (no key needed, use curl):\n"
-            "- Weather: subprocess.run(['curl', '-s', 'wttr.in/92880?format=j1'], capture_output=True, text=True) — JSON with city name, temp, conditions\n"
-            "- Weather (simple): subprocess.run(['curl', '-s', 'wttr.in/92880?format=3'], capture_output=True, text=True) — zip: ☀️ +81°F (no city name)\n"
-            "- IP info: subprocess.run(['curl', '-s', 'ifconfig.me'], capture_output=True, text=True)\n"
-            "- Web fetch: subprocess.run(['curl', '-s', '-L', url], capture_output=True, text=True)\n"
-            "- Web search: subprocess.run(['curl', '-s', '-X', 'POST', 'https://mcp.exa.ai/mcp', '-H', 'Content-Type: application/json', '-H', 'Accept: application/json, text/event-stream', '-d', json.dumps({\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"web_search_exa\",\"arguments\":{\"query\":\"YOUR QUERY\",\"numResults\":3}},\"id\":1})], capture_output=True, text=True)\n"
+            "9. NEVER add information not in the output. Report ONLY what the code returns.\n"
+            "\n\nBUILT-IN HELPERS (already imported, just use them):\n"
+            "- curl(url) → response text (e.g. print(curl('http://example.com')))\n"
+            "- weather(location) → dict with area, region, temp_F, feels_F, humidity, desc, wind_mph (e.g. w=weather('92880'); print(w))\n"
+            "- subprocess.run([...], capture_output=True, text=True) → CompletedProcess (use .stdout for output)\n"
+            "\n\nFREE APIs (no key needed):\n"
+            "- Weather: weather('92880') or curl('wttr.in/92880?format=3')\n"
+            "- IP info: curl('ifconfig.me')\n"
+            "- Web fetch: curl(url)\n"
+            "- Web search: curl('https://mcp.exa.ai/mcp') with POST and JSON body\n"
         )
         if self._is_multimodal():
             base += (
