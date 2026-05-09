@@ -345,7 +345,7 @@ def cmd_uninstall(args):
     if os.path.isdir(tq_dir):
         import shutil
         shutil.rmtree(tq_dir)
-        removed.append(f"~/.tq (venv, binary, logs, config)")
+        removed.append("~/.tq (venv, binary, logs, config)")
     link = os.path.expanduser("~/.local/bin/tq")
     if os.path.islink(link):
         os.unlink(link)
@@ -356,7 +356,7 @@ def cmd_uninstall(args):
     if os.path.isfile(shell_rc):
         with open(shell_rc) as f:
             lines = f.readlines()
-        filtered = [l for l in lines if 'tq-serve' not in l and 'tq — TurboQuant' not in l]
+        filtered = [l for l in lines if 'tq-serve' not in l and 'tq — TurboQuant' not in l and '~/.local/bin' not in l]
         if len(filtered) != len(lines):
             with open(shell_rc, "w") as f:
                 f.writelines(filtered)
@@ -365,9 +365,11 @@ def cmd_uninstall(args):
         console.print("[bold green]Uninstalled tq:[/bold green]")
         for r in removed:
             console.print(f"  [dim]•[/dim] {r}")
+        console.print("\n[bold yellow]tq has been removed.[/bold yellow] This command will not work again.")
+        console.print("[dim]Open a new terminal to clear it from your session.[/dim]")
     else:
         console.print("[dim]Nothing to uninstall.[/dim]")
-    console.print("\n[dim]GGUF models were NOT removed. Delete manually if desired.[/dim]")
+    console.print("[dim]GGUF models were NOT removed. Delete manually if desired.[/dim]")
 
 
 def cmd_install(args):
