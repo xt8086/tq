@@ -409,6 +409,20 @@ class ChatSession:
 
     def _extract_pdf_text(self, path: str) -> Optional[str]:
         try:
+            from pypdf import PdfReader
+            reader = PdfReader(path)
+            pages = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text and text.strip():
+                    pages.append(text.strip())
+            if pages:
+                return "\n\n".join(pages)[:30000]
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        try:
             import subprocess
             result = subprocess.run(
                 ["pdftotext", path, "-"],
@@ -418,17 +432,6 @@ class ChatSession:
                 return result.stdout.strip()[:30000]
         except FileNotFoundError:
             pass
-        except Exception:
-            pass
-        try:
-            import re as _re
-            with open(path, "rb") as f:
-                raw = f.read(500000)
-            text = raw.decode("latin-1")
-            chunks = _re.findall(r'\(([^)]{3,})\)', text)
-            clean = [c.strip() for c in chunks if c.strip() and not c.strip().startswith('\\')]
-            if clean:
-                return "\n".join(clean)[:30000]
         except Exception:
             pass
         return None

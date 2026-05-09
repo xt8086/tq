@@ -38,7 +38,7 @@ dependencies = [
 tq = "tq.cli:main"
 
 [project.optional-dependencies]
-chat = ["httpx>=0.25", "prompt_toolkit>=3.0"]
+chat = ["httpx>=0.25", "prompt_toolkit>=3.0", "pypdf>=3.0", "Pillow>=10.0"]
 dev = ["pytest>=7.0", "pytest-mock>=3.0"]
 
 [project.urls]

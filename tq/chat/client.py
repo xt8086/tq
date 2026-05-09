@@ -59,15 +59,29 @@ def load_pdf_as_images(path: str) -> list[str]:
                 ["pdftoppm", "-png", "-r", "150", path, os.path.join(tmpdir, "page")],
                 capture_output=True, text=True, timeout=30,
             )
-            if result.returncode != 0:
-                return []
-            images = []
-            for f in sorted(os.listdir(tmpdir)):
-                if f.endswith(".png"):
-                    img = load_image_as_base64(os.path.join(tmpdir, f))
-                    if img:
-                        images.append(img)
-            return images
+            if result.returncode == 0:
+                images = []
+                for f in sorted(os.listdir(tmpdir)):
+                    if f.endswith(".png"):
+                        img = load_image_as_base64(os.path.join(tmpdir, f))
+                        if img:
+                            images.append(img)
+                if images:
+                    return images
+    except Exception:
+        pass
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(path)
+        images = []
+        for page in reader.pages:
+            for img_obj in page.images:
+                ext = os.path.splitext(img_obj.name)[1].lower()
+                mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+                mime = mime_map.get(ext, "image/png")
+                b64 = base64.b64encode(img_obj.data).decode()
+                images.append(f"data:{mime};base64,{b64}")
+        return images[:10]
     except Exception:
         return []
 
