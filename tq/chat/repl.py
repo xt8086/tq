@@ -23,6 +23,14 @@ import sys
 import threading
 
 
+_BARE_CODE_RE = re.compile(
+    r'^\s*(?:from\s+\w|import\s+\w|def\s+\w|class\s+\w|if\s+|for\s+|while\s+|try:|with\s+|'
+    r'(?:w|result|output|data|r|response|img)\s*=\s*(?:weather|curl|websearch|subprocess)\s*\(|'
+    r'print\s*\(|subprocess\.run)',
+    re.MULTILINE,
+)
+
+
 def extract_python_blocks(text: str) -> list[str]:
     exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
     if exec_blocks:
@@ -30,7 +38,21 @@ def extract_python_blocks(text: str) -> list[str]:
     blocks = re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
     if blocks:
         return blocks
-    return re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
+    bash_blocks = re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
+    if bash_blocks:
+        return bash_blocks
+    lines = text.splitlines()
+    bare = []
+    for line in lines:
+        if _BARE_CODE_RE.match(line):
+            bare.append(line)
+        elif bare and line.strip() and not line.strip().startswith(('- ', '* ', '# ', '1.', '2.', '3.')):
+            bare.append(line)
+        elif bare:
+            break
+    if bare:
+        return ['\n'.join(bare)]
+    return []
 
 
 _AUTO_IMPORTS = """import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.request
