@@ -36,16 +36,26 @@ _BARE_CODE_RE = re.compile(
 )
 
 
+_SHELL_CMD_RE = re.compile(
+    r'^\s*(?:ifconfig|ipconfig|netstat|ping|traceroute|whoami|hostname|uname|'
+    r'ls|cat|head|tail|grep|find|ps|df|du|top|kill|systemctl|networksetup|'
+    r'scutil|defaults|diskutil|brew|port|npm|pip|which|whereis|echo|mkdir|'
+    r'cp|mv|rm|chmod|chown|curl|wget|dig|nslookup|ssh|scp|rsync|git|docker|'
+    r'python3?|node|ruby|java|gcc|make|cmake|cargo)\b',
+    re.MULTILINE,
+)
+
+
 def extract_python_blocks(text: str) -> list[str]:
     exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
     if exec_blocks:
-        return exec_blocks
+        return [_wrap_if_shell(b) for b in exec_blocks]
     blocks = re.findall(r'```python\s*\n(.*?)```', text, re.DOTALL)
     if blocks:
         return blocks
     bash_blocks = re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
     if bash_blocks:
-        return bash_blocks
+        return [_wrap_if_shell(b) for b in bash_blocks]
     helper_calls = _HELPER_CALL_RE.findall(text)
     if helper_calls:
         code_parts = []
@@ -68,6 +78,23 @@ def extract_python_blocks(text: str) -> list[str]:
     if bare:
         return ['\n'.join(bare)]
     return []
+
+
+def _wrap_if_shell(code: str) -> str:
+    stripped = code.strip()
+    if '\n' not in stripped and _SHELL_CMD_RE.match(stripped):
+        return f'print(exec({repr(stripped)}))'
+    lines = stripped.splitlines()
+    all_shell = all(not l.strip() or _SHELL_CMD_RE.match(l.strip()) or l.strip().startswith('|') or l.strip().startswith('>') or l.strip().startswith(';') or l.strip().startswith('#') or l.strip().startswith('-') for l in lines)
+    if all_shell and any(_SHELL_CMD_RE.match(l.strip()) for l in lines if l.strip() and not l.strip().startswith('#')):
+        parts = []
+        for l in lines:
+            s = l.strip()
+            if not s or s.startswith('#'):
+                continue
+            parts.append(f'print(exec({repr(s)}))')
+        return '\n'.join(parts)
+    return code
 
 
 _AUTO_IMPORTS = """import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.parse,urllib.request
@@ -664,20 +691,22 @@ class ChatSession:
             "- To search the web: websearch(\"your search query\")\n"
             "- To fetch a URL: curl(\"https://example.com\")\n"
             "- To get weather: weather(\"92880\") or weather(\"Corona, CA\")\n"
-            "- To run a shell command: exec(\"ls -la\")\n"
+            "- To run a shell command: exec(\"ls -la\") or exec(\"ifconfig\")\n"
             "\nJust write the call with your argument — the system handles the rest.\n"
             "\nExamples:\n"
             '  User: weather in Corona CA → weather("Corona, CA")\n'
             '  User: search for AI news → websearch("AI news today")\n'
             '  User: what is on that page → curl("https://example.com")\n'
             '  User: list files → exec("ls -la")\n'
+            '  User: network info → exec("ifconfig")\n'
+            '  User: am I online → exec("ping -c 1 google.com")\n'
             "\nRULES:\n"
             '1. Always use quotes around your argument: weather("92880") not weather(92880)\n'
             "2. For multi-step tasks, output multiple calls on separate lines\n"
             "3. websearch() is best for questions and lookups\n"
             "4. weather() gives current conditions only; use websearch() or curl() for forecasts\n"
             "5. curl() is for fetching a known URL\n"
-            "6. exec() is for running shell commands\n"
+            "6. exec() is for ANY shell command — ifconfig, netstat, ping, ls, git, etc.\n"
             "7. NEVER use mock data or make up results — only report what the calls return\n"
             "8. If you also know Python, you can write ```exec code blocks for complex logic\n"
         )
