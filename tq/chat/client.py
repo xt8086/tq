@@ -52,6 +52,24 @@ def load_image_as_base64(path: str) -> Optional[str]:
 
 def load_pdf_as_images(path: str) -> list[str]:
     try:
+        import fitz
+        doc = fitz.open(path)
+        images = []
+        for page in doc:
+            pix = page.get_pixmap(dpi=150)
+            png_bytes = pix.tobytes("png")
+            b64 = base64.b64encode(png_bytes).decode()
+            images.append(f"data:image/png;base64,{b64}")
+            if len(images) >= 10:
+                break
+        doc.close()
+        if images:
+            return images
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    try:
         import subprocess
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -70,20 +88,7 @@ def load_pdf_as_images(path: str) -> list[str]:
                     return images
     except Exception:
         pass
-    try:
-        from pypdf import PdfReader
-        reader = PdfReader(path)
-        images = []
-        for page in reader.pages:
-            for img_obj in page.images:
-                ext = os.path.splitext(img_obj.name)[1].lower()
-                mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
-                mime = mime_map.get(ext, "image/png")
-                b64 = base64.b64encode(img_obj.data).decode()
-                images.append(f"data:{mime};base64,{b64}")
-        return images[:10]
-    except Exception:
-        return []
+    return []
 
 
 def load_docx_as_text(path: str) -> Optional[str]:
