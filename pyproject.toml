@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tq-serve"
-version = "0.3.0"
+version = "0.4.0"
 description = "TurboQuant model server manager — auto-configured llama-server with KV cache compression"
 readme = "README.md"
 license = "MIT"
@@ -42,5 +42,5 @@ chat = ["httpx>=0.25", "prompt_toolkit>=3.0", "pypdf>=3.0", "PyMuPDF>=1.24"]
 dev = ["pytest>=7.0", "pytest-mock>=3.0"]
 
 [project.urls]
-Homepage = "https://github.com/shengchiao/tq"
-Repository = "https://github.com/shengchiao/tq"
+Homepage = "https://github.com/xt8086/tq"
+Repository = "https://github.com/xt8086/tq"

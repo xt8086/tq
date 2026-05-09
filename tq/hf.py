@@ -108,6 +108,15 @@ def _verify_or_store_hash(filepath: str, model_id: str, filename: str) -> None:
         _save_hashes(hashes)
 
 
+def remove_hash_for_file(filename: str) -> None:
+    hashes = _load_hashes()
+    to_remove = [k for k in hashes if k.endswith(f"/{filename}")]
+    for k in to_remove:
+        del hashes[k]
+    if to_remove:
+        _save_hashes(hashes)
+
+
 def _load_hashes() -> dict:
     if not os.path.isfile(HASHES_FILE):
         return {}

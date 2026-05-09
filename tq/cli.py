@@ -18,7 +18,7 @@ from .parser import build_model_metadata, GGUFParserError
 from .hardware import detect_hardware
 from .recommender import recommend
 from .server import start_server, stop_server, get_server_status, load_state, _find_binary, _check_health
-from .hf import search_models as hf_search, download_model
+from .hf import search_models as hf_search, download_model, remove_hash_for_file
 from .installer import install_binary, get_platform_tag
 from .types import ServerConfig, CacheType
 
@@ -456,6 +456,107 @@ def cmd_chat(args):
     session.start()
 
 
+def cmd_remove(args):
+    model_dir = cfg.get_model_dir()
+
+    model_path = resolve_model_path(model_dir, args.model)
+    if not model_path:
+        console.print(f"[red]Model not found:[/red] {args.model}")
+        _show_removable_models(model_dir)
+        sys.exit(1)
+
+    try:
+        from .security import validate_gguf_path
+        validated = validate_gguf_path(model_path, model_dir)
+    except ValueError:
+        console.print(f"[red]Cannot remove:[/red] {model_path}")
+        console.print("[dim]This model is managed externally (not in tq's model directory).[/dim]")
+        console.print("[dim]Only models downloaded via 'tq download' can be removed.[/dim]")
+        sys.exit(1)
+
+    state = load_state()
+    if state:
+        if os.path.realpath(state.model_path) == os.path.realpath(validated):
+            console.print("[red]Cannot remove:[/red] Model is currently being served")
+            console.print("[dim]Run [bold]tq stop[/bold] first, then remove the model.[/dim]")
+            sys.exit(1)
+
+    from .scanner import _find_mmproj
+    mmproj_path = _find_mmproj(validated)
+
+    size_bytes = os.path.getsize(validated)
+    mmproj_size = 0
+    if mmproj_path and os.path.isfile(mmproj_path):
+        mmproj_size = os.path.getsize(mmproj_path)
+    total_bytes = size_bytes + mmproj_size
+
+    display_name = os.path.basename(validated)
+    size_str = _format_size(total_bytes)
+
+    detail = f"{display_name} ({size_str})"
+    if mmproj_path:
+        detail += f"\n  + mmproj: {os.path.basename(mmproj_path)} ({_format_size(mmproj_size)})"
+
+    if not args.yes:
+        console.print(f"[bold]Remove[/bold] {detail}?")
+        try:
+            answer = input("  [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if answer not in ("y", "yes"):
+            console.print("[dim]Cancelled.[/dim]")
+            return
+
+    try:
+        os.unlink(validated)
+    except FileNotFoundError:
+        console.print(f"[dim]{display_name} already removed[/dim]")
+
+    if mmproj_path and os.path.isfile(mmproj_path):
+        os.unlink(mmproj_path)
+
+    remove_hash_for_file(display_name)
+
+    _cleanup_empty_parents(validated, model_dir)
+    if mmproj_path:
+        _cleanup_empty_parents(mmproj_path, model_dir)
+
+    console.print(f"[green]Removed[/green] {display_name} ({size_str} freed)")
+
+
+def _format_size(size_bytes: int) -> str:
+    if size_bytes >= 1024 ** 3:
+        return f"{size_bytes / (1024 ** 3):.1f} GB"
+    elif size_bytes >= 1024 ** 2:
+        return f"{size_bytes / (1024 ** 2):.1f} MB"
+    else:
+        return f"{size_bytes / 1024:.0f} KB"
+
+
+def _show_removable_models(model_dir: str):
+    models = scan_models(model_dir, system_wide=False)
+    if not models:
+        return
+    console.print("[dim]Removable models:[/dim]")
+    for m in models:
+        console.print(f"  [dim]• {m.display_name} ({m.size_gb:.1f}G)[/dim]")
+
+
+def _cleanup_empty_parents(path: str, stop_at: str):
+    stop_at = os.path.realpath(stop_at)
+    current = os.path.realpath(os.path.dirname(path))
+    while current != stop_at and current.startswith(stop_at + os.sep):
+        try:
+            if not os.listdir(current):
+                os.rmdir(current)
+                current = os.path.dirname(current)
+            else:
+                break
+        except OSError:
+            break
+
+
 def cmd_config(args):
     if args.action == "show" or args.action is None:
         config = cfg.load_config()
@@ -529,6 +630,10 @@ def main():
 
     uninst = sub.add_parser("uninstall", help="Remove tq and all its data")
 
+    rm = sub.add_parser("remove", help="Remove a downloaded model")
+    rm.add_argument("model", help="Model name, number (from tq list), or path")
+    rm.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
+
     doc = sub.add_parser("doctor", help="Verify setup and configuration")
 
     cf = sub.add_parser("config", help="Show/edit configuration")
@@ -567,6 +672,7 @@ def main():
         "validate": cmd_validate,
         "install": cmd_install,
         "uninstall": cmd_uninstall,
+        "remove": cmd_remove,
         "doctor": cmd_doctor,
         "config": cmd_config,
         "chat": cmd_chat,

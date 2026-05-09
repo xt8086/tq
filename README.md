@@ -45,6 +45,7 @@ Example: A Q4_K_M model on Apple M1 with 8GB RAM gets:
 | `tq list` | List local GGUF models |
 | `tq search <query>` | Search HuggingFace for GGUF models |
 | `tq download <model>` | Download a model from HuggingFace |
+| `tq remove <model>` | Remove a downloaded model |
 | `tq serve <model>` | Launch with auto TurboQuant config |
 | `tq serve 1` | Serve by list number |
 | `tq serve 1 --dry-run` | Show command without running |
@@ -55,6 +56,7 @@ Example: A Q4_K_M model on Apple M1 with 8GB RAM gets:
 | `tq install` | Download TurboQuant+ binary |
 | `tq doctor` | Verify setup |
 | `tq config show` | Show/edit configuration |
+| `tq chat` | Interactive coding agent (local AI) |
 
 ## API
 

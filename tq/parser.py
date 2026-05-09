@@ -325,7 +325,9 @@ _SMALL_MODEL_PATTERNS = (
     "smollm",
     "tinyllama",
     "qwen2-0.5b", "qwen2-1.5b",
+    "qwen2.5-0.5b", "qwen2.5-1.5b", "qwen2.5-3b",
     "qwen3-0.6b", "qwen3-1.7b",
+    "qwen3.5-0.8b", "qwen3.5-1.5b", "qwen3.5-2b",
 )
 
 
