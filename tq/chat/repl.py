@@ -33,10 +33,13 @@ def extract_python_blocks(text: str) -> list[str]:
     return re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
 
 
+_AUTO_IMPORTS = "import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.request\n"
+
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
+    full_code = _AUTO_IMPORTS + code
     try:
         result = subprocess.run(
-            [sys.executable, "-c", code],
+            [sys.executable, "-c", full_code],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -44,7 +47,12 @@ def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str
         )
         output = result.stdout
         if result.stderr:
-            output += ("\n" if output else "") + result.stderr
+            stderr = "\n".join(
+                line for line in result.stderr.strip().splitlines()
+                if "MallocStackLogging" not in line
+            )
+            if stderr:
+                output += ("\n" if output else "") + stderr
         if result.returncode != 0 and not result.stderr:
             output += f"\n[exit code: {result.returncode}]"
         return output.strip(), result.returncode != 0
