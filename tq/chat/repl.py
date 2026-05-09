@@ -307,12 +307,13 @@ class ChatSession:
                     self._trim_oversized_messages()
                     render_info("Trimmed oversized messages — retrying...")
                     continue
+                if "500" in str(e):
+                    self._remove_last_broken_exchange()
+                    render_info("Recovered from server error — retrying...")
+                    continue
                 render_error(f"Request failed: {e}")
                 if msg_count_before < len(self.messages):
                     del self.messages[msg_count_before:]
-                if "500" in str(e) and tool_calls:
-                    render_info("Model may not support tool calling — retrying without tools")
-                    self._send_without_tools()
                 break
 
             if response_text:
@@ -432,9 +433,9 @@ class ChatSession:
                 self._process_code_blocks(response_text)
         except Exception as e:
             print(flush=True)
-            if "400" in str(e):
-                self._trim_oversized_messages()
-                render_info("Trimmed oversized messages — retrying...")
+            if "400" in str(e) or "500" in str(e):
+                self._remove_last_broken_exchange()
+                render_info("Recovered from server error — retrying...")
                 self._send_and_process_no_tools()
             else:
                 render_error(f"Request failed: {e}")
@@ -465,6 +466,17 @@ class ChatSession:
                 return
         if len(self.messages) > 4:
             del self.messages[1:-2]
+
+    def _remove_last_broken_exchange(self):
+        while self.messages and self.messages[-1].role != "user":
+            self.messages.pop()
+        if self.messages and self.messages[-1].role == "user":
+            content = self.messages[-1].content
+            self.messages.pop()
+            if content.startswith("[Code output]") and len(self.messages) and self.messages[-1].role == "assistant":
+                self.messages.pop()
+            if self.messages and self.messages[-1].role == "assistant" and not self.messages[-1].content.strip():
+                self.messages.pop()
 
     def _attach_files(self, text: str, msg: ChatMessage) -> ChatMessage:
         import re as _re
