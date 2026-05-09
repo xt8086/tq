@@ -38,6 +38,8 @@ def curl(url,timeout=10):
  return subprocess.run(['curl','-s',url],capture_output=True,text=True,timeout=timeout).stdout
 def weather(location):
  r=curl(f'wttr.in/{location}?format=j1');d=json.loads(r);a=d['nearest_area'][0];c=d['current_condition'][0];return {'area':a['areaName'][0]['value'],'region':a['region'][0]['value'],'temp_F':c['temp_F'],'feels_F':c['FeelsLikeF'],'humidity':c['humidity'],'desc':c['weatherDesc'][0]['value'],'wind_mph':c['windspeedMiles']}
+def websearch(query,num=3):
+ r=subprocess.run(['curl','-s','-X','POST','https://mcp.exa.ai/mcp','-H','Content-Type: application/json','-H','Accept: application/json, text/event-stream','-d',json.dumps({"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search_exa","arguments":{"query":query,"numResults":num}},"id":1})],capture_output=True,text=True,timeout=15).stdout;lines=[l for l in r.strip().splitlines() if l.startswith('data:')];data=[json.loads(l[5:]) for l in lines if l[5:].strip()];results=[];[results.extend(c.get('result',{}).get('content',[])) for c in data if 'result' in c];return results
 """
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
@@ -625,21 +627,22 @@ class ChatSession:
             "1. Use ```exec for code you want executed. Use ```python only for examples you do NOT want executed.\n"
             "2. For HTTP requests: print(curl(url)) — curl() returns the response text directly, no .stdout needed.\n"
             "3. For weather: w=weather('92880'); print(w) — returns dict with area, temp_F, desc, humidity, wind_mph.\n"
-            "4. For web search: r=curl('https://mcp.exa.ai/mcp'); then parse the JSON response.\n"
+            "4. For web search: results=websearch('your query'); print(results) — returns list of results, no API key needed.\n"
             "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
             "6. NEVER import requests — it is not installed. Use curl() instead.\n"
-            "7. NEVER run pip install or install any packages — only use the pre-imported libraries and curl().\n"
+            "7. NEVER run pip install or install any packages — only use the pre-imported libraries and helpers.\n"
             "8. Always print your results so they appear in the output.\n"
             "9. NEVER add information not in the output. Report ONLY what the code returns.\n"
             "\n\nBUILT-IN HELPERS (already imported, just use them):\n"
             "- curl(url) → response text (e.g. print(curl('http://example.com')))\n"
             "- weather(location) → dict with area, region, temp_F, feels_F, humidity, desc, wind_mph (e.g. w=weather('92880'); print(w))\n"
+            "- websearch(query, num=3) → list of search results (e.g. results=websearch('US Iran news'); print(results))\n"
             "- subprocess.run([...], capture_output=True, text=True) → CompletedProcess (use .stdout for output)\n"
             "\n\nFREE APIs (no key needed):\n"
             "- Weather: weather('92880') or curl('wttr.in/92880?format=3')\n"
+            "- Web search: websearch('your query')\n"
             "- IP info: curl('ifconfig.me')\n"
             "- Web fetch: curl(url)\n"
-            "- Web search: curl('https://mcp.exa.ai/mcp') with POST and JSON body\n"
         )
         if self._is_multimodal():
             base += (
