@@ -6,3 +6,4 @@ build/
 .venv/
 *.tar.gz
 *.whl
+mom_check.jpg
