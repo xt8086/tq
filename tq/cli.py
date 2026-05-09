@@ -459,7 +459,21 @@ def cmd_chat(args):
 def cmd_remove(args):
     model_dir = cfg.get_model_dir()
 
-    model_path = resolve_model_path(model_dir, args.model)
+    model_arg = args.model
+    if not model_arg:
+        models = scan_models(model_dir, system_wide=False)
+        if not models:
+            console.print(f"[dim]No removable models in {model_dir}[/dim]")
+            return
+        for i, m in enumerate(models, 1):
+            console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G)", highlight=False)
+        try:
+            model_arg = input("  Remove which model? [number]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+
+    model_path = resolve_model_path(model_dir, model_arg)
     if not model_path:
         console.print(f"[red]Model not found:[/red] {args.model}")
         _show_removable_models(model_dir)
@@ -631,7 +645,7 @@ def main():
     uninst = sub.add_parser("uninstall", help="Remove tq and all its data")
 
     rm = sub.add_parser("remove", help="Remove a downloaded model")
-    rm.add_argument("model", help="Model name, number (from tq list), or path")
+    rm.add_argument("model", nargs="?", default="", help="Model name, number (from tq list), or path")
     rm.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
 
     doc = sub.add_parser("doctor", help="Verify setup and configuration")
