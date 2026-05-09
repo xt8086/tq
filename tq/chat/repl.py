@@ -250,6 +250,7 @@ class ChatSession:
     def _send_and_process(self):
         max_iterations = 20
         for _ in range(max_iterations):
+            self._error_count = 0
             response_text = ""
             tool_calls: list[ToolCall] = []
             current_tc: dict = {}
@@ -303,18 +304,18 @@ class ChatSession:
                 break
             except Exception as e:
                 print(flush=True)
+                self._error_count = getattr(self, '_error_count', 0) + 1
+                if self._error_count >= 3:
+                    render_error(f"Request failed repeatedly: {e}")
+                    if msg_count_before < len(self.messages):
+                        del self.messages[msg_count_before:]
+                    break
                 if "400" in str(e):
                     self._trim_oversized_messages()
-                    render_info("Trimmed oversized messages — retrying...")
-                    continue
-                if "500" in str(e):
+                else:
                     self._remove_last_broken_exchange()
-                    render_info("Recovered from server error — retrying...")
-                    continue
-                render_error(f"Request failed: {e}")
-                if msg_count_before < len(self.messages):
-                    del self.messages[msg_count_before:]
-                break
+                render_info(f"Request failed ({e}) — retrying ({self._error_count}/3)...")
+                continue
 
             if response_text:
                 print(flush=True)
@@ -433,12 +434,16 @@ class ChatSession:
                 self._process_code_blocks(response_text)
         except Exception as e:
             print(flush=True)
-            if "400" in str(e) or "500" in str(e):
-                self._remove_last_broken_exchange()
-                render_info("Recovered from server error — retrying...")
-                self._send_and_process_no_tools()
+            self._error_count = getattr(self, '_error_count', 0) + 1
+            if self._error_count >= 3:
+                render_error(f"Request failed repeatedly: {e}")
+                return
+            if "400" in str(e):
+                self._trim_oversized_messages()
             else:
-                render_error(f"Request failed: {e}")
+                self._remove_last_broken_exchange()
+            render_info(f"Request failed ({e}) — retrying ({self._error_count}/3)...")
+            self._send_and_process_no_tools()
 
     def _send_without_tools(self):
         try:
