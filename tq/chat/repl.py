@@ -55,13 +55,15 @@ def extract_python_blocks(text: str) -> list[str]:
     return []
 
 
-_AUTO_IMPORTS = """import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.request
+_AUTO_IMPORTS = """import subprocess,os,json,sys,math,re,datetime,pathlib,urllib.parse,urllib.request
 def curl(url,timeout=10):
- return subprocess.run(['curl','-s',url],capture_output=True,text=True,timeout=timeout).stdout
+ if not url.startswith('http'): url='https://'+url
+ return subprocess.run(['curl','-sL',url],capture_output=True,text=True,timeout=timeout).stdout
 def weather(location):
- r=curl(f'wttr.in/{location}?format=j1');d=json.loads(r);a=d['nearest_area'][0];c=d['current_condition'][0];return {'area':a['areaName'][0]['value'],'region':a['region'][0]['value'],'temp_F':c['temp_F'],'feels_F':c['FeelsLikeF'],'humidity':c['humidity'],'desc':c['weatherDesc'][0]['value'],'wind_mph':c['windspeedMiles']}
+ loc=urllib.parse.quote(location.replace(' ','+'))
+ r=curl(f'wttr.in/{loc}?format=j1');d=json.loads(r);a=d['nearest_area'][0];c=d['current_condition'][0];return {'area':a['areaName'][0]['value'],'region':a['region'][0]['value'],'temp_F':c['temp_F'],'feels_F':c['FeelsLikeF'],'humidity':c['humidity'],'desc':c['weatherDesc'][0]['value'],'wind_mph':c['windspeedMiles']}
 def websearch(query,num=3):
- r=subprocess.run(['curl','-s','-X','POST','https://mcp.exa.ai/mcp','-H','Content-Type: application/json','-H','Accept: application/json, text/event-stream','-d',json.dumps({"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search_exa","arguments":{"query":query,"numResults":num}},"id":1})],capture_output=True,text=True,timeout=15).stdout;lines=[l for l in r.strip().splitlines() if l.startswith('data:')];data=[json.loads(l[5:]) for l in lines if l[5:].strip()];results=[];[results.extend(c.get('result',{}).get('content',[])) for c in data if 'result' in c];return results
+ r=subprocess.run(['curl','-s','-X','POST','https://mcp.exa.ai/mcp','-H','Content-Type: application/json','-H','Accept: application/json, text/event-stream','-d',json.dumps({"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search_exa","arguments":{"query":query,"numResults":num}},"id":1})],capture_output=True,text=True,timeout=15).stdout;lines=[l for l in r.strip().splitlines() if l.startswith('data:')];data=[json.loads(l[5:]) for l in lines if l[5:].strip()];raw=[];[raw.extend(c.get('result',{}).get('content',[])) for c in data if 'result' in c];texts=[item['text'] if isinstance(item,dict) and 'text' in item else str(item) for item in raw];return '\\n---\\n'.join(texts) if texts else 'No results found'
 """
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
