@@ -23,6 +23,11 @@ import sys
 import threading
 
 
+_HELPER_CALL_RE = re.compile(
+    r'(?:^|\n)\s*(websearch|curl|weather|exec)\s*\(\s*(["\'].*?["\'])\s*\)',
+    re.MULTILINE,
+)
+
 _BARE_CODE_RE = re.compile(
     r'^\s*(?:from\s+\w|import\s+\w|def\s+\w|class\s+\w|if\s+|for\s+|while\s+|try:|with\s+|'
     r'\w+\s*=\s*(?:weather|curl|websearch|subprocess)\s*\(|'
@@ -41,6 +46,16 @@ def extract_python_blocks(text: str) -> list[str]:
     bash_blocks = re.findall(r'```bash\s*\n(.*?)```', text, re.DOTALL)
     if bash_blocks:
         return bash_blocks
+    helper_calls = _HELPER_CALL_RE.findall(text)
+    if helper_calls:
+        code_parts = []
+        for func, arg in helper_calls:
+            if func == 'exec':
+                code_parts.append(arg.strip('"\''))
+            else:
+                code_parts.append(f'print({func}({arg}))')
+        if code_parts:
+            return ['\n'.join(code_parts)]
     lines = text.splitlines()
     bare = []
     for line in lines:
@@ -64,6 +79,8 @@ def weather(location):
  r=curl(f'wttr.in/{loc}?format=j1');d=json.loads(r);a=d['nearest_area'][0];c=d['current_condition'][0];return {'area':a['areaName'][0]['value'],'region':a['region'][0]['value'],'temp_F':c['temp_F'],'feels_F':c['FeelsLikeF'],'humidity':c['humidity'],'desc':c['weatherDesc'][0]['value'],'wind_mph':c['windspeedMiles']}
 def websearch(query,num=3):
  r=subprocess.run(['curl','-s','-X','POST','https://mcp.exa.ai/mcp','-H','Content-Type: application/json','-H','Accept: application/json, text/event-stream','-d',json.dumps({"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search_exa","arguments":{"query":query,"numResults":num}},"id":1})],capture_output=True,text=True,timeout=15).stdout;lines=[l for l in r.strip().splitlines() if l.startswith('data:')];data=[json.loads(l[5:]) for l in lines if l[5:].strip()];raw=[];[raw.extend(c.get('result',{}).get('content',[])) for c in data if 'result' in c];texts=[item['text'] if isinstance(item,dict) and 'text' in item else str(item) for item in raw];return '\\n---\\n'.join(texts) if texts else 'No results found'
+def exec(cmd,timeout=10):
+ return subprocess.run(cmd,shell=True,capture_output=True,text=True,timeout=timeout).stdout
 """
 
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
@@ -643,32 +660,26 @@ class ChatSession:
     def _code_block_system_addendum(self) -> str:
         base = (
             "\n\nIMPORTANT: You do NOT have access to tool-calling. "
-            "Instead, when you need to execute commands or perform actions, "
-            "write Python code inside ```exec code blocks. "
-            "Your code will be automatically extracted, executed, and the output fed back to you. "
-            "Only write code you actually need executed — do not write example or illustrative code blocks. "
-            "\n\nRULES:\n"
-            "1. Use ```exec for code you want executed. Use ```python only for examples you do NOT want executed.\n"
-            "2. For questions or searches: use websearch() FIRST. It returns real search results, no API key needed.\n"
-            "3. For weather CURRENT conditions: w=weather('92880'); print(w). For forecasts use websearch() or curl('wttr.in/92880?format=j1').\n"
-            "4. For fetching a known URL: print(curl(url)) — returns response text directly, no .stdout needed.\n"
-            "5. NEVER use mock data, placeholder responses, simulated output, or API keys like 'YOUR_API_KEY'.\n"
-            "6. NEVER import requests — it is not installed. Use curl() instead.\n"
-            "7. NEVER run pip install or install any packages — only use the pre-imported libraries and helpers.\n"
-            "8. Always print your results so they appear in the output.\n"
-            "9. NEVER add information not in the output. Report ONLY what the code returns.\n"
-            "\n\nBUILT-IN HELPERS (already imported, just use them):\n"
-            "- websearch(query, num=3) → list of search results — USE THIS FIRST for questions and lookups\n"
-            "- curl(url) → response text (e.g. print(curl('http://example.com')))\n"
-            "- weather(location) → dict with area, region, temp_F, feels_F, humidity, desc, wind_mph (current conditions only)\n"
-            "- subprocess.run([...], capture_output=True, text=True) → CompletedProcess (use .stdout for output)\n"
-            "\n\nPRIORITY: websearch() for queries → curl() for known URLs → weather() for quick current conditions\n"
-            "\n\nFREE APIs (no key needed):\n"
-            "- Web search: websearch('your query')\n"
-            "- Weather current: weather('92880') or curl('wttr.in/92880?format=3')\n"
-            "- Weather forecast: curl('wttr.in/92880?format=j1') or websearch('92880 10 day forecast')\n"
-            "- IP info: curl('ifconfig.me')\n"
-            "- Web fetch: curl(url)\n"
+            "Instead, to perform actions just output a helper call directly — no code blocks, no Python syntax needed:\n"
+            "- To search the web: websearch(\"your search query\")\n"
+            "- To fetch a URL: curl(\"https://example.com\")\n"
+            "- To get weather: weather(\"92880\") or weather(\"Corona, CA\")\n"
+            "- To run a shell command: exec(\"ls -la\")\n"
+            "\nJust write the call with your argument — the system handles the rest.\n"
+            "\nExamples:\n"
+            '  User: weather in Corona CA → weather("Corona, CA")\n'
+            '  User: search for AI news → websearch("AI news today")\n'
+            '  User: what is on that page → curl("https://example.com")\n'
+            '  User: list files → exec("ls -la")\n'
+            "\nRULES:\n"
+            '1. Always use quotes around your argument: weather("92880") not weather(92880)\n'
+            "2. For multi-step tasks, output multiple calls on separate lines\n"
+            "3. websearch() is best for questions and lookups\n"
+            "4. weather() gives current conditions only; use websearch() or curl() for forecasts\n"
+            "5. curl() is for fetching a known URL\n"
+            "6. exec() is for running shell commands\n"
+            "7. NEVER use mock data or make up results — only report what the calls return\n"
+            "8. If you also know Python, you can write ```exec code blocks for complex logic\n"
         )
         if self._is_multimodal():
             base += (
