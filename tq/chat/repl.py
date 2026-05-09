@@ -24,7 +24,7 @@ import threading
 
 
 _HELPER_CALL_RE = re.compile(
-    r'(?:^|\n)\s*(websearch|curl|weather|exec)\s*\(\s*(["\'].*?["\'])\s*\)',
+    r'(?:^|\n)\s*(websearch|curl|weather|exec)\s*\(\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')\s*\)',
     re.MULTILINE,
 )
 
