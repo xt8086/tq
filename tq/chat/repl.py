@@ -110,6 +110,14 @@ def exec(cmd,timeout=10):
  return subprocess.run(cmd,shell=True,capture_output=True,text=True,timeout=timeout).stdout
 """
 
+def _smart_truncate(text: str, limit: int = 4000) -> str:
+    if len(text) <= limit:
+        return text
+    head = limit // 2
+    tail = limit // 2
+    return text[:head] + f"\n\n... ({len(text) - limit:,} chars omitted) ...\n\n" + text[-tail:]
+
+
 def execute_python_code(code: str, workdir: str, timeout: int = 30) -> tuple[str, bool]:
     full_code = _AUTO_IMPORTS + code
     try:
@@ -295,6 +303,10 @@ class ChatSession:
                 break
             except Exception as e:
                 print(flush=True)
+                if "400" in str(e):
+                    self._trim_oversized_messages()
+                    render_info("Trimmed oversized messages — retrying...")
+                    continue
                 render_error(f"Request failed: {e}")
                 if msg_count_before < len(self.messages):
                     del self.messages[msg_count_before:]
@@ -380,6 +392,7 @@ class ChatSession:
                 continue
 
             output, is_error = execute_python_code(code, self.workdir)
+            output = _smart_truncate(output, 4000)
             if output:
                 preview_out = output[:300] + ("..." if len(output) > 300 else "")
                 if is_error:
@@ -419,7 +432,12 @@ class ChatSession:
                 self._process_code_blocks(response_text)
         except Exception as e:
             print(flush=True)
-            render_error(f"Request failed: {e}")
+            if "400" in str(e):
+                self._trim_oversized_messages()
+                render_info("Trimmed oversized messages — retrying...")
+                self._send_and_process_no_tools()
+            else:
+                render_error(f"Request failed: {e}")
 
     def _send_without_tools(self):
         try:
@@ -438,6 +456,15 @@ class ChatSession:
         except Exception as e:
             print(flush=True)
             render_error(f"Retry failed: {e}")
+
+    def _trim_oversized_messages(self):
+        for i in range(len(self.messages) - 1, -1, -1):
+            m = self.messages[i]
+            if len(m.content) > 4000:
+                m.content = _smart_truncate(m.content, 4000)
+                return
+        if len(self.messages) > 4:
+            del self.messages[1:-2]
 
     def _attach_files(self, text: str, msg: ChatMessage) -> ChatMessage:
         import re as _re
