@@ -64,16 +64,17 @@ def download_model(
     model_dir = os.path.expanduser(model_dir)
     os.makedirs(model_dir, exist_ok=True)
 
+    try:
+        files = list_repo_files(model_id)
+    except Exception as e:
+        raise RuntimeError(f"Failed to list files: {e}")
+
     if filename is None:
-        try:
-            files = list_repo_files(model_id)
-            gguf_files = [f for f in files if f.endswith(".gguf")]
-            if not gguf_files:
-                raise FileNotFoundError(f"No GGUF files found in {model_id}")
-            q4_files = [f for f in gguf_files if "Q4_K_M" in f]
-            filename = (q4_files + gguf_files)[0]
-        except Exception as e:
-            raise RuntimeError(f"Failed to list files: {e}")
+        gguf_files = [f for f in files if f.endswith(".gguf")]
+        if not gguf_files:
+            raise FileNotFoundError(f"No GGUF files found in {model_id}")
+        q4_files = [f for f in gguf_files if "Q4_K_M" in f]
+        filename = (q4_files + gguf_files)[0]
 
     local_path = hf_hub_download(
         repo_id=model_id,
@@ -83,6 +84,14 @@ def download_model(
 
     if verify_hash:
         _verify_or_store_hash(local_path, model_id, filename)
+
+    mmproj_files = [f for f in files if os.path.basename(f).lower().startswith("mmproj") and f.endswith(".gguf")]
+    for mmproj in mmproj_files:
+        hf_hub_download(
+            repo_id=model_id,
+            filename=mmproj,
+            local_dir=model_dir,
+        )
 
     return local_path
 

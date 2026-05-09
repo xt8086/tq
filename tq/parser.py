@@ -194,12 +194,19 @@ def read_gguf_metadata_from_file(path: str) -> dict:
     with open(path, "rb") as f:
         header_data = f.read(8 * 1024 * 1024)
 
-    metadata = parse_gguf_metadata(header_data)
+    try:
+        metadata = parse_gguf_metadata(header_data)
+    except GGUFParserError:
+        metadata = {}
 
     if _needs_more_data(metadata, header_data):
         with open(path, "rb") as f:
             header_data = f.read(32 * 1024 * 1024)
-        metadata = parse_gguf_metadata(header_data)
+        try:
+            metadata = parse_gguf_metadata(header_data)
+        except GGUFParserError:
+            if not metadata:
+                metadata = {}
 
     return metadata
 
