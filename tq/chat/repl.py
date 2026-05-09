@@ -61,7 +61,7 @@ def extract_python_blocks(text: str) -> list[str]:
         code_parts = []
         for func, arg in helper_calls:
             if func == 'exec':
-                code_parts.append(arg.strip('"\''))
+                code_parts.append(f'print(exec({arg}))')
             else:
                 code_parts.append(f'print({func}({arg}))')
         if code_parts:
@@ -107,7 +107,7 @@ def weather(location):
 def websearch(query,num=3):
  r=subprocess.run(['curl','-s','-X','POST','https://mcp.exa.ai/mcp','-H','Content-Type: application/json','-H','Accept: application/json, text/event-stream','-d',json.dumps({"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search_exa","arguments":{"query":query,"numResults":num}},"id":1})],capture_output=True,text=True,timeout=15).stdout;lines=[l for l in r.strip().splitlines() if l.startswith('data:')];data=[json.loads(l[5:]) for l in lines if l[5:].strip()];raw=[];[raw.extend(c.get('result',{}).get('content',[])) for c in data if 'result' in c];texts=[item['text'] if isinstance(item,dict) and 'text' in item else str(item) for item in raw];return '\\n---\\n'.join(texts) if texts else 'No results found'
 def exec(cmd,timeout=10):
- return subprocess.run(cmd,shell=True,capture_output=True,text=True,timeout=timeout).stdout
+ r=subprocess.run(cmd,shell=True,capture_output=True,text=True,timeout=timeout);o=r.stdout;e=r.stderr.strip();o+=('\n'+e) if e else '';return o+('',f'\n[exit code: {r.returncode}]')[r.returncode!=0] if o else ('',f'[exit code: {r.returncode}]')[r.returncode!=0]
 """
 
 def _smart_truncate(text: str, limit: int = 4000) -> str:
