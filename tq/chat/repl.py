@@ -150,7 +150,8 @@ class ChatSession:
             if not user_input:
                 continue
 
-            if user_input.startswith("/") and not os.path.isabs(user_input.split()[0]):
+            first_token = user_input.split()[0]
+            if user_input.startswith("/") and not (os.path.sep in first_token[1:] or "." in first_token):
                 if self._handle_command(user_input):
                     break
                 continue
