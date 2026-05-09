@@ -334,6 +334,42 @@ def cmd_validate(args):
         console.print("[red]Model may not fit in available memory.[/red]")
 
 
+def cmd_uninstall(args):
+    from .server import stop_server
+    status = get_server_status()
+    if status:
+        console.print("[dim]Stopping server...[/dim]")
+        stop_server()
+    removed = []
+    tq_dir = os.path.expanduser("~/.tq")
+    if os.path.isdir(tq_dir):
+        import shutil
+        shutil.rmtree(tq_dir)
+        removed.append(f"~/.tq (venv, binary, logs, config)")
+    link = os.path.expanduser("~/.local/bin/tq")
+    if os.path.islink(link):
+        os.unlink(link)
+        removed.append("~/.local/bin/tq symlink")
+    shell_rc = os.path.expanduser("~/.zshrc")
+    if not os.path.isfile(shell_rc):
+        shell_rc = os.path.expanduser("~/.bashrc")
+    if os.path.isfile(shell_rc):
+        with open(shell_rc) as f:
+            lines = f.readlines()
+        filtered = [l for l in lines if 'tq-serve' not in l and 'tq — TurboQuant' not in l]
+        if len(filtered) != len(lines):
+            with open(shell_rc, "w") as f:
+                f.writelines(filtered)
+            removed.append(f"shell rc entries ({os.path.basename(shell_rc)})")
+    if removed:
+        console.print("[bold green]Uninstalled tq:[/bold green]")
+        for r in removed:
+            console.print(f"  [dim]•[/dim] {r}")
+    else:
+        console.print("[dim]Nothing to uninstall.[/dim]")
+    console.print("\n[dim]GGUF models were NOT removed. Delete manually if desired.[/dim]")
+
+
 def cmd_install(args):
     console.print(f"[bold]Installing TurboQuant+ llama-server[/bold]")
     console.print(f"[dim]Platform: {platform.system()} {platform.machine()}[/dim]")
@@ -489,6 +525,8 @@ def main():
     inst = sub.add_parser("install", help="Download and install TurboQuant+ llama-server binary")
     inst.add_argument("--force", action="store_true", help="Reinstall even if already installed")
 
+    uninst = sub.add_parser("uninstall", help="Remove tq and all its data")
+
     doc = sub.add_parser("doctor", help="Verify setup and configuration")
 
     cf = sub.add_parser("config", help="Show/edit configuration")
@@ -526,6 +564,7 @@ def main():
         "logs": cmd_logs,
         "validate": cmd_validate,
         "install": cmd_install,
+        "uninstall": cmd_uninstall,
         "doctor": cmd_doctor,
         "config": cmd_config,
         "chat": cmd_chat,
