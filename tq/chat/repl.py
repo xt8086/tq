@@ -142,7 +142,7 @@ class ChatSession:
             if not user_input:
                 continue
 
-            if user_input.startswith("/"):
+            if user_input.startswith("/") and not os.path.isabs(user_input.split()[0]):
                 if self._handle_command(user_input):
                     break
                 continue
@@ -416,6 +416,19 @@ class ChatSession:
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()[:30000]
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
+        try:
+            import re as _re
+            with open(path, "rb") as f:
+                raw = f.read(500000)
+            text = raw.decode("latin-1")
+            chunks = _re.findall(r'\(([^)]{3,})\)', text)
+            clean = [c.strip() for c in chunks if c.strip() and not c.strip().startswith('\\')]
+            if clean:
+                return "\n".join(clean)[:30000]
         except Exception:
             pass
         return None
