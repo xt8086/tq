@@ -460,12 +460,13 @@ def cmd_remove(args):
     model_dir = cfg.get_model_dir()
 
     model_arg = args.model
+    tq_models = scan_models(model_dir, system_wide=False)
+
     if not model_arg:
-        models = scan_models(model_dir, system_wide=False)
-        if not models:
+        if not tq_models:
             console.print(f"[dim]No removable models in {model_dir}[/dim]")
             return
-        for i, m in enumerate(models, 1):
+        for i, m in enumerate(tq_models, 1):
             console.print(f"  {i}. {m.display_name}  ({m.size_gb:.1f}G)", highlight=False)
         try:
             model_arg = input("  Remove which model? [number]: ").strip()
@@ -473,7 +474,15 @@ def cmd_remove(args):
             print()
             return
 
-    model_path = resolve_model_path(model_dir, model_arg)
+    if model_arg.isdigit():
+        idx = int(model_arg) - 1
+        if 0 <= idx < len(tq_models):
+            model_path = tq_models[idx].path
+        else:
+            console.print(f"[red]Invalid number:[/red] {model_arg}")
+            sys.exit(1)
+    else:
+        model_path = resolve_model_path(model_dir, model_arg)
     if not model_path:
         console.print(f"[red]Model not found:[/red] {args.model}")
         _show_removable_models(model_dir)
