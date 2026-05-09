@@ -6,7 +6,7 @@
 - **PyPI**: https://pypi.org/project/tq-serve/ (owner: `wondermotor_ai`)
 - **GitHub**: git@github.com:xt8086/tq.git (branch: main)
 - **Website**: wondermotor.com (index.html in repo root)
-- **Current version**: 0.4.0
+- **Current version**: 0.4.2
 
 ## Architecture
 
@@ -35,7 +35,7 @@ Each command = `cmd_xxx(args)` function + argparse subparser in `main()` + entry
 
 ### tq chat Modes (two modes, auto-detected)
 1. **Tool-calling mode**: For models with OpenAI tool support (detected by `_detect_tool_support` in parser.py). Uses full tool set (bash, read, write, etc.)
-2. **Code block mode**: For non-tool models. System prompt instructs model to write `` ```exec `` blocks. Python code auto-executed with built-in helpers: `curl()`, `weather()`, `websearch()`
+2. **Code block mode**: For non-tool models. System prompt instructs model to write simple helper calls: `curl()`, `weather()`, `websearch()`, `exec()`. All calls are wrapped in `print(func(arg))` before execution.
 
 Tool support detection logic (`_detect_tool_support`):
 - Small models (by name pattern in `_SMALL_MODEL_PATTERNS`) → NONE
@@ -71,9 +71,20 @@ Tool support detection logic (`_detect_tool_support`):
 - 0.2.0 — Chat, tools, websearch, weather helpers
 - 0.3.0 — Uninstall command, fix install.sh symlink
 - 0.4.0 — `tq remove` command, fix GitHub URLs to xt8086/tq, update small model patterns (Qwen3.5)
+- 0.4.1 — Fix exec() handler: wrap in print(exec(arg)) instead of stripping quotes; exec() helper now returns stderr + exit code on failure
+- 0.4.2 — Same as 0.4.1 (re-published to fix PyPI package)
 
 ## Design Decisions
 - `tq remove` only removes models in tq's model_dir (`~/.tq/models/`), not system-wide models
 - Binary (llama-server) is NOT on PyPI — it comes from GitHub Releases (TheTom/llama-cpp-turboquant)
 - Models < 3B are classified as "small" → no tool support → code block mode only
 - Server auto-stops after idle timeout (default 5 min, configurable)
+
+## Tested Configurations
+`tq chat` has been tested with the following models and hardware only:
+- **Ministral 3B** (code block mode — non-tool)
+- **Qwen3.5 4B** (falls back to code block mode — detected as tool-calling but calls with empty args)
+
+**Hardware**: MacBook Air M1, 8GB RAM
+
+Other models, larger hardware, or tool-calling mode have not been tested. Behavior may vary.
