@@ -38,6 +38,8 @@ info "Platform: ${OS} ${ARCH}"
 
 TQ_VENV="$HOME/.tq/venv"
 TQ_BIN="$TQ_VENV/bin/tq"
+TQ_LINK_DIR="$HOME/.local/bin"
+TQ_LINK="$TQ_LINK_DIR/tq"
 
 info "Creating virtual environment..."
 python3 -m venv "$TQ_VENV"
@@ -48,40 +50,53 @@ info "Installing tq package..."
 info "Installing TurboQuant+ llama-server binary..."
 "$TQ_BIN" install
 
-SHELL_RC="$HOME/.zshrc"
-if [ "$SHELL" = "bash" ]; then
-    SHELL_RC="$HOME/.bashrc"
-elif [ "$SHELL" = "fish" ]; then
-    SHELL_RC="$HOME/.config/fish/config.fish"
+mkdir -p "$TQ_LINK_DIR"
+ln -sf "$TQ_BIN" "$TQ_LINK"
+
+NEED_PATH_UPDATE=false
+case ":$PATH:" in
+    *":$TQ_LINK_DIR:"*) ;;
+    *) NEED_PATH_UPDATE=true ;;
+esac
+
+if [ "$NEED_PATH_UPDATE" = true ]; then
+    SHELL_RC="$HOME/.zshrc"
+    if [ "$SHELL" = "bash" ]; then
+        SHELL_RC="$HOME/.bashrc"
+    elif [ "$SHELL" = "fish" ]; then
+        SHELL_RC="$HOME/.config/fish/config.fish"
+    fi
+
+    if [ "$SHELL" = "fish" ]; then
+        if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
+            echo '' >> "$SHELL_RC"
+            echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
+            echo 'set -gx PATH $PATH '"'$TQ_LINK_DIR'" >> "$SHELL_RC"
+        fi
+    else
+        if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
+            echo '' >> "$SHELL_RC"
+            echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
+            echo 'export PATH="$PATH:'"$TQ_LINK_DIR"'"' >> "$SHELL_RC"
+        fi
+    fi
 fi
 
-if [ "$SHELL" = "fish" ]; then
-    if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
-        echo '' >> "$SHELL_RC"
-        echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
-        echo 'alias tq="'"$TQ_BIN"'"' >> "$SHELL_RC"
-    fi
-else
-    if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
-        echo '' >> "$SHELL_RC"
-        echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
-        echo 'alias tq="'"$TQ_BIN"'"' >> "$SHELL_RC"
-    fi
-fi
+export PATH="$PATH:$TQ_LINK_DIR"
 
 mkdir -p "$HOME/.tq/models"
-
-alias tq="$TQ_BIN" 2>/dev/null || true
 
 echo ""
 info "${BOLD}Installation complete!${RESET}"
 echo ""
-echo "  Open a new terminal (or run: source $SHELL_RC)"
-echo "  Then:"
-echo "    tq doctor          # Verify setup"
+echo "  tq doctor          # Verify setup"
 echo "    tq list            # List local GGUF models"
 echo "    tq search <query>  # Search HuggingFace"
 echo "    tq download <id>   # Download a model"
 echo "    tq serve 1         # Launch with auto-configured TurboQuant"
 echo "    tq chat            # Interactive coding agent (local AI)"
-echo ""
+if [ "$NEED_PATH_UPDATE" = true ]; then
+    echo ""
+    warn "Open a new terminal for tq to be in PATH, or run:"
+    echo "  source $SHELL_RC"
+fi
