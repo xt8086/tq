@@ -232,6 +232,9 @@ class ChatSession:
         render_info("Type /help for commands. Ctrl+C to cancel, Ctrl+D to quit.")
         render_divider()
 
+        self._write_agent_instructions()
+        render_info("Agent instructions written to ~/.tq/AGENTS.md")
+
         self._repl_loop()
 
     def _repl_loop(self):
@@ -694,6 +697,72 @@ class ChatSession:
             return
         render_info(f"Context ~{tokens:,}/{limit:,} tokens — auto-compressing...")
         self._cmd_compact()
+
+    def _write_agent_instructions(self):
+        n_ctx = self._get_context_limit()
+        compaction_threshold = int(n_ctx * 0.8)
+        mode = "code-block" if self.tools_disabled else "tool-calling"
+        state = load_state()
+        model_name = os.path.basename(state.model_path) if state else self.model
+        is_mm = self._is_multimodal()
+        tq_dir = os.path.expanduser("~/.tq")
+        os.makedirs(tq_dir, exist_ok=True)
+        path = os.path.join(tq_dir, "AGENTS.md")
+        lines = [
+            "# tq — Local LLM Server for AI Agents",
+            "",
+            "## Connection",
+            f"- Server: {self.base_url}",
+            f"- Model: {model_name}",
+            f"- Mode: {mode}",
+            f"- Multimodal: {'yes' if is_mm else 'no'}",
+            "",
+            "## Context Budget",
+            f"- Context window (n_ctx): {n_ctx:,} tokens",
+            f"- Auto-compaction triggers at: {compaction_threshold:,} tokens (80%)",
+            "- When context exceeds 80%, conversation is compressed into a summary",
+            "- After compaction, context resets to ~2 messages (system + summary)",
+            "- Progressive degradation: each compaction loses earlier details",
+            "",
+        ]
+        if self.tools_disabled:
+            lines += [
+                "## Code-Block Mode (non-tool models)",
+                "This model does NOT support OpenAI tool-calling. Use simple helper calls instead:",
+                '- Search the web: websearch("your query")',
+                '- Fetch a URL: curl("https://example.com")',
+                '- Get weather: weather("92880") or weather("Corona, CA")',
+                '- Run a shell command: exec("ls -la") or exec("ifconfig")',
+                "",
+                "Rules:",
+                '- Always use quotes around arguments: weather("92880") not weather(92880)',
+                "- For simple commands, use exec() — one command per call, no pipes",
+                '- For pipes/redirects, use a ```exec code block',
+                "- Never ask permission to execute — just write the call",
+                "- Never fabricate command output — only report actual results",
+                "",
+            ]
+        else:
+            lines += [
+                "## Tool-Calling Mode",
+                "This model supports OpenAI-style tool calling. Available tools: bash, read, write, edit, glob, grep, list, websearch, webfetch.",
+                "",
+            ]
+        if is_mm:
+            lines += [
+                "## Vision",
+                "When a user message includes a file path to an image, the system auto-attaches it.",
+                'If you need to see an image, ask: "Please include the file path in your next message."',
+                "Do NOT try to open/read images with exec() or subprocess.",
+                "",
+            ]
+        lines += [
+            "## Tips",
+            "- Reference this file in your project AGENTS.md: `{file:~/.tq/AGENTS.md}`",
+            f"- Updated automatically when `tq chat` starts (current: v0.4.13)",
+        ]
+        with open(path, "w") as f:
+            f.write("\n".join(lines) + "\n")
 
     def _cmd_model(self, arg: str):
         models = self.client.list_models()

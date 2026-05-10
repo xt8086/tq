@@ -6,7 +6,7 @@
 - **PyPI**: https://pypi.org/project/tq-serve/ (owner: `wondermotor_ai`)
 - **GitHub**: git@github.com:xt8086/tq.git (branch: main)
 - **Website**: wondermotor.com (index.html in repo root)
-- **Current version**: 0.4.13
+- **Current version**: 0.4.14
 
 ## Architecture
 
@@ -84,6 +84,7 @@ Tool support detection logic (`_detect_tool_support`):
 - 0.4.11 — Smarter `_wrap_if_shell`: detect non-Python code blocks (no Python patterns) and auto-wrap as shell even if command not in `_SHELL_CMD_RE`
 - 0.4.12 — Fixed VISION prompt — model knew file paths but didn't know how to trigger image viewing; updated to explicitly state: images auto-attach when user includes path, model should ask user to include path, do NOT try exec()/subprocess to read images
 - 0.4.13 — Remove 4-step workflow (ANALYZE→PLAN→EXECUTE→FINALIZE) from non-tool system prompt; remove FINALIZE truncation from extract_python_blocks(). Workflow was ineffective for small models; execution cap (_code_exec_limit=5) remains as real loop prevention.
+- 0.4.14 — Auto-compaction: detect context at 80% of n_ctx, compress before overflow. Write ~/.tq/AGENTS.md on startup with connection info, token budget, and mode-specific instructions for external AI agents (opencode, pi, etc.).
 
 ## Design Decisions
 - `tq remove` only removes models in tq's model_dir (`~/.tq/models/`), not system-wide models
