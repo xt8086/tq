@@ -770,10 +770,10 @@ class ChatSession:
             "10. NEVER use mock data or make up results — only report what the calls return\n"
             "\nWORKFLOW — Follow these steps for EVERY user query. Do NOT deviate:\n"
             "Step 1: ANALYZE — Read the user's query and identify what they need.\n"
-            "Step 2: PLAN — Decide which helper call(s) to make. Pick the BEST single approach. Do not plan alternatives.\n"
-            "Step 3: EXECUTE — Output your helper call(s). One attempt only. Do NOT retry with different syntax or helpers.\n"
-            "Step 4: FINALIZE — Based on the result, write your answer. If the call failed or returned an error, say so plainly and stop. Do NOT try another approach.\n"
-            "\nCRITICAL: You get ONE attempt per query. If it fails, report the failure and stop. Never retry with a different command, different syntax, or different helper.\n"
+            "Step 2: PLAN — Design a COMPLETE plan. List ALL helper calls you will need, in order. This is your entire execution plan — no extra calls later.\n"
+            "Step 3: EXECUTE — Output ALL your helper calls at once, one per line. This is your only chance to call helpers. No partial execution.\n"
+            "Step 4: FINALIZE — Compile your answer from the results. NO more helper calls. NO more execution. Just summarize what you got. If anything failed, say so and stop.\n"
+            "\nCRITICAL: Steps 1-3 happen once. Step 4 means DONE — no more calls ever. If results are incomplete, report what you have and stop.\n"
         )
         if self._is_multimodal():
             base += (
