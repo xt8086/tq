@@ -23,7 +23,7 @@ tq install
 ```bash
 tq doctor                        # Verify setup
 tq list                          # List local GGUF models
-tq search "qwen2.5 coder 7b"    # Search HuggingFace (then pick a # to download)
+tq search "qwen2.5 coder 7b"    # Search HuggingFace (numbered, pick # to download)
 tq serve 1                       # Launch with auto-configured TurboQuant
 tq chat                          # Interactive coding agent
 ```

@@ -293,7 +293,7 @@
     <ol class="steps">
       <li>Install: <code>curl -fsSL https://wondermotor.com/install.sh | bash</code></li>
       <li>List models: <code>tq list</code></li>
-      <li>Search &amp; download: <code>tq search "qwen2.5 coder 7b"</code> then <code>tq download &lt;model&gt;</code></li>
+      <li>Search &amp; download: <code>tq search "qwen2.5 coder 7b"</code> &mdash; pick a number to download</li>
       <li>Serve: <code>tq serve 1</code> &mdash; TurboQuant auto-configured.</li>
     </ol>
 
@@ -327,8 +327,7 @@
 </div>
 <script>
 function copyInstall() {
-  const text = 'curl -fsSL https://wondermotor.com/install.sh | bash';
-  navigator.clipboard.writeText(text).then(() => {
+  const text = 'curl -fsSL https://wondermotor.com/install.sh | bash';  navigator.clipboard.writeText(text).then(() => {
     const btn = document.querySelector('.copy-btn');
     btn.textContent = 'Copied';
     btn.classList.add('copied');
