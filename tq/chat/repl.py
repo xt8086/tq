@@ -52,10 +52,6 @@ _SHELL_CMD_RE = re.compile(
 
 
 def extract_python_blocks(text: str) -> list[str]:
-    finalize_re = re.compile(r'(?:Step\s*4|FINALIZE)\b', re.IGNORECASE)
-    finalize_match = finalize_re.search(text)
-    if finalize_match:
-        text = text[:finalize_match.start()]
     exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
     if exec_blocks:
         return [_wrap_if_shell(b) for b in exec_blocks]
@@ -196,6 +192,7 @@ class ChatSession:
         self._code_exec_count = 0
         self._code_exec_limit = 5
         self._is_mm = False
+        self._n_ctx: int | None = None
         self.cancel_event = threading.Event()
 
     def start(self):
@@ -275,6 +272,7 @@ class ChatSession:
             self.messages.append(msg)
             self.cancel_event.clear()
             self._code_exec_count = 0
+            self._auto_compact()
             self._send_and_process()
 
     def _send_and_process(self):
@@ -670,6 +668,33 @@ class ChatSession:
             ]
             render_info("Context compressed")
 
+    def _estimate_tokens(self) -> int:
+        return sum(len(m.content) for m in self.messages) // 4
+
+    def _get_context_limit(self) -> int:
+        if self._n_ctx is not None:
+            return self._n_ctx
+        state = load_state()
+        if state:
+            try:
+                meta = build_model_metadata(state.model_path)
+                if meta.context_length:
+                    self._n_ctx = meta.context_length
+                    return self._n_ctx
+            except Exception:
+                pass
+        self._n_ctx = 4096
+        return self._n_ctx
+
+    def _auto_compact(self):
+        limit = self._get_context_limit()
+        threshold = int(limit * 0.8)
+        tokens = self._estimate_tokens()
+        if tokens < threshold:
+            return
+        render_info(f"Context ~{tokens:,}/{limit:,} tokens — auto-compressing...")
+        self._cmd_compact()
+
     def _cmd_model(self, arg: str):
         models = self.client.list_models()
         if not models:
@@ -788,23 +813,17 @@ class ChatSession:
             "   ifconfig | grep en0\n"
             "   ```\n"
             "10. NEVER use mock data or make up results — only report what the calls return\n"
-            "\nWORKFLOW — Follow these steps for EVERY user query. Do NOT deviate:\n"
-            "Step 1: ANALYZE — Read the user's query and identify what they need.\n"
-            "Step 2: PLAN — Design a COMPLETE plan. Describe what you will do. Do NOT write exec() calls here — just describe the steps.\n"
-            "Step 3: EXECUTE — Write ALL your helper calls here. This is the ONLY step where exec() calls go. Write them and STOP. Do NOT ask for permission. Do NOT wait for confirmation. Just write the calls.\n"
-            "Step 4: FINALIZE — Compile your answer from the results. NO helper calls. NO execution. If no results came back, say 'No results obtained' and stop. NEVER make up or guess results.\n"
-            "\nCRITICAL RULES:\n"
-            "- Step 3 is MANDATORY. You MUST write exec() calls in Step 3. Skipping Step 3 is forbidden.\n"
-            "- NEVER ask 'Should I execute?' or 'Shall I proceed?' — just do it in Step 3.\n"
-            "- NEVER make up command output. If Step 3 didn't run, say 'No results obtained'.\n"
-            "- Steps 1-3 happen once. Step 4 means DONE — no more calls ever.\n"
+            "11. Write helper calls directly — do NOT ask 'Should I execute?' or 'Shall I proceed?'. Just write them.\n"
+            "12. NEVER make up command output — only report what the calls actually return. If a call didn't run, say 'No results obtained'.\n"
             "NEVER write raw shell commands in your explanation text. Commands outside exec() or ```exec blocks will NOT execute. Always use exec() or ```exec blocks for any command.\n"
         )
         if self._is_multimodal():
             base += (
                 "\n\nVISION: You have multimodal/vision capabilities. "
-                "When the user asks about an image or document, it will be attached automatically for you to see and analyze. "
-                "You do NOT need to extract text or use subprocess to read images/PDFs.\n"
+                "When a user message includes a file path to an image, the system auto-attaches it for you to see. "
+                "If you need to view an image file, tell the user: \"Please include the file path in your next message so I can see it.\" "
+                "Do NOT try to open or read image files with subprocess or exec() — you can only see images that are attached. "
+                "For non-image files, use exec() as usual.\n"
             )
         base += f"\nWorking directory: {self.workdir}"
         return base
