@@ -84,9 +84,6 @@ def extract_python_blocks(text: str) -> list[str]:
             break
     if bare:
         return ['\n'.join(bare)]
-    shell_lines = [l for l in text.splitlines() if l.strip() and _SHELL_CMD_RE.match(l.strip())]
-    if shell_lines:
-        return ['\n'.join(f'print(exec({repr(s.strip())}))' for s in shell_lines)]
     return []
 
 
@@ -774,6 +771,7 @@ class ChatSession:
             "Step 3: EXECUTE — Output ALL your helper calls at once, one per line. This is your only chance to call helpers. No partial execution.\n"
             "Step 4: FINALIZE — Compile your answer from the results. NO more helper calls. NO more execution. Just summarize what you got. If anything failed, say so and stop.\n"
             "\nCRITICAL: Steps 1-3 happen once. Step 4 means DONE — no more calls ever. If results are incomplete, report what you have and stop.\n"
+            "NEVER write raw shell commands in your explanation text. Commands outside exec() or ```exec blocks will NOT execute. Always use exec() or ```exec blocks for any command.\n"
         )
         if self._is_multimodal():
             base += (
