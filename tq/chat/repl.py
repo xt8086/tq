@@ -91,13 +91,32 @@ def extract_python_blocks(text: str) -> list[str]:
     return []
 
 
+_PYTHON_LINE_RE = re.compile(
+    r'^\s*(?:from\s+\w|import\s+\w|def\s+\w|class\s+\w|if\s+|for\s+|while\s+|try:|with\s+|'
+    r'\w+\s*=\s+|print\s*\(|subprocess\.|os\.|json\.|sys\.|pathlib\.|return\s|raise\s|assert\s|'
+    r'elif\s|else:|except|finally:|break|continue|pass|yield\s|del\s|global\s|nonlocal\s)',
+    re.MULTILINE,
+)
+
+
 def _wrap_if_shell(code: str) -> str:
     stripped = code.strip()
+    if not stripped:
+        return code
     if '\n' not in stripped and _SHELL_CMD_RE.match(stripped):
         return f'print(exec({repr(stripped)}))'
     lines = stripped.splitlines()
     all_shell = all(not l.strip() or _SHELL_CMD_RE.match(l.strip()) or l.strip().startswith('|') or l.strip().startswith('>') or l.strip().startswith(';') or l.strip().startswith('#') or l.strip().startswith('-') for l in lines)
     if all_shell and any(_SHELL_CMD_RE.match(l.strip()) for l in lines if l.strip() and not l.strip().startswith('#')):
+        parts = []
+        for l in lines:
+            s = l.strip()
+            if not s or s.startswith('#'):
+                continue
+            parts.append(f'print(exec({repr(s)}))')
+        return '\n'.join(parts)
+    has_python = any(_PYTHON_LINE_RE.match(l) for l in lines if l.strip() and not l.strip().startswith('#'))
+    if not has_python:
         parts = []
         for l in lines:
             s = l.strip()

@@ -6,7 +6,7 @@
 - **PyPI**: https://pypi.org/project/tq-serve/ (owner: `wondermotor_ai`)
 - **GitHub**: git@github.com:xt8086/tq.git (branch: main)
 - **Website**: wondermotor.com (index.html in repo root)
-- **Current version**: 0.4.10
+- **Current version**: 0.4.11
 
 ## Architecture
 
@@ -81,6 +81,7 @@ Tool support detection logic (`_detect_tool_support`):
 - 0.4.8 — Remove shell command fallback (was catching commands in Step 4 explanations and re-triggering execution loops); system prompt: unwrapped commands will NOT execute
 - 0.4.9 — Truncate response text at FINALIZE/Step 4 marker before extracting code blocks — prevents code in Step 4 from triggering execution
 - 0.4.10 — Enforce Step 3 mandatory (no skipping, no asking permission), Step 2 = describe plan only (no exec calls), never make up results in Step 4
+- 0.4.11 — Smarter `_wrap_if_shell`: detect non-Python code blocks (no Python patterns) and auto-wrap as shell even if command not in `_SHELL_CMD_RE`
 
 ## Design Decisions
 - `tq remove` only removes models in tq's model_dir (`~/.tq/models/`), not system-wide models
