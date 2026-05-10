@@ -768,6 +768,12 @@ class ChatSession:
             "   ifconfig | grep en0\n"
             "   ```\n"
             "10. NEVER use mock data or make up results — only report what the calls return\n"
+            "\nWORKFLOW — Follow these steps for EVERY user query. Do NOT deviate:\n"
+            "Step 1: ANALYZE — Read the user's query and identify what they need.\n"
+            "Step 2: PLAN — Decide which helper call(s) to make. Pick the BEST single approach. Do not plan alternatives.\n"
+            "Step 3: EXECUTE — Output your helper call(s). One attempt only. Do NOT retry with different syntax or helpers.\n"
+            "Step 4: FINALIZE — Based on the result, write your answer. If the call failed or returned an error, say so plainly and stop. Do NOT try another approach.\n"
+            "\nCRITICAL: You get ONE attempt per query. If it fails, report the failure and stop. Never retry with a different command, different syntax, or different helper.\n"
         )
         if self._is_multimodal():
             base += (
