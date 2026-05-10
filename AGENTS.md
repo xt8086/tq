@@ -6,7 +6,7 @@
 - **PyPI**: https://pypi.org/project/tq-serve/ (owner: `wondermotor_ai`)
 - **GitHub**: git@github.com:xt8086/tq.git (branch: main)
 - **Website**: wondermotor.com (index.html in repo root)
-- **Current version**: 0.4.3
+- **Current version**: 0.4.4
 
 ## Architecture
 
@@ -74,6 +74,7 @@ Tool support detection logic (`_detect_tool_support`):
 - 0.4.1 — Fix exec() handler: wrap in print(exec(arg)) instead of stripping quotes; exec() helper now returns stderr + exit code on failure
 - 0.4.2 — Same as 0.4.1 (re-published to fix PyPI package)
 - 0.4.3 — Fix exec() helper: escape \n as \\n in _AUTO_IMPORTS string (single \n became literal newline, breaking python -c)
+- 0.4.4 — Lenient fallback regex for exec() (catches malformed calls with extra junk after closing paren); system prompt: exec() for simple commands only, ```exec``` blocks for pipes/redirects
 
 ## Design Decisions
 - `tq remove` only removes models in tq's model_dir (`~/.tq/models/`), not system-wide models

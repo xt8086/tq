@@ -28,6 +28,11 @@ _HELPER_CALL_RE = re.compile(
     re.MULTILINE,
 )
 
+_HELPER_CALL_LENIENT_RE = re.compile(
+    r'(?:^|\n)\s*(exec)\s*\(\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')',
+    re.MULTILINE,
+)
+
 _BARE_CODE_RE = re.compile(
     r'^\s*(?:from\s+\w|import\s+\w|def\s+\w|class\s+\w|if\s+|for\s+|while\s+|try:|with\s+|'
     r'\w+\s*=\s*(?:weather|curl|websearch|subprocess)\s*\(|'
@@ -57,6 +62,8 @@ def extract_python_blocks(text: str) -> list[str]:
     if bash_blocks:
         return [_wrap_if_shell(b) for b in bash_blocks]
     helper_calls = _HELPER_CALL_RE.findall(text)
+    if not helper_calls:
+        helper_calls = _HELPER_CALL_LENIENT_RE.findall(text)
     if helper_calls:
         code_parts = []
         for func, arg in helper_calls:
@@ -750,9 +757,14 @@ class ChatSession:
             "3. websearch() is best for questions and lookups\n"
             "4. weather() gives current conditions only; use websearch() or curl() for forecasts\n"
             "5. curl() is for fetching a known URL\n"
-            "6. exec() is for ANY shell command — ifconfig, netstat, ping, ls, git, etc.\n"
-            "7. NEVER use mock data or make up results — only report what the calls return\n"
-            "8. If you also know Python, you can write ```exec code blocks for complex logic\n"
+            "6. exec() is for SIMPLE shell commands only — one command per call, no pipes or redirects\n"
+            "7. For commands with pipes (|), redirects (>), or && — use a ```exec code block instead\n"
+            "8. Examples of SIMPLE exec: exec(\"ifconfig\"), exec(\"ls -la\"), exec(\"ping -c 1 google.com\")\n"
+            "9. Examples of code blocks for complex commands:\n"
+            "   ```exec\n"
+            "   ifconfig | grep en0\n"
+            "   ```\n"
+            "10. NEVER use mock data or make up results — only report what the calls return\n"
         )
         if self._is_multimodal():
             base += (
