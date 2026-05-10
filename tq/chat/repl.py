@@ -84,6 +84,9 @@ def extract_python_blocks(text: str) -> list[str]:
             break
     if bare:
         return ['\n'.join(bare)]
+    shell_lines = [l for l in text.splitlines() if l.strip() and _SHELL_CMD_RE.match(l.strip())]
+    if shell_lines:
+        return ['\n'.join(f'print(exec({repr(s.strip())}))' for s in shell_lines)]
     return []
 
 
