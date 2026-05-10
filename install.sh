@@ -4,99 +4,72 @@ set -euo pipefail
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
+DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-info()  { echo -e "${GREEN}[tq]${RESET} $*"; }
-warn()  { echo -e "${YELLOW}[tq]${RESET} $*"; }
-error() { echo -e "${RED}[tq]${RESET} $*" >&2; exit 1; }
+info()  { echo -e "${GREEN}✓${RESET} $1"; }
+warn()  { echo -e "${YELLOW}⚠${RESET} $1"; }
+error() { echo -e "${RED}✗${RESET} $1"; }
+step()  { echo -e "${BOLD}==>${RESET} $1"; }
 
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+step "Installing tq — TurboQuant Model Server Manager"
 
-if [ "$OS" != "Darwin" ] && [ "$OS" != "Linux" ]; then
-    error "Unsupported OS: $OS. Only macOS and Linux are supported."
+# --- pip install ---
+step "Installing tq-serve via pip..."
+if command -v pip3 &>/dev/null; then
+    PIP=pip3
+elif command -v pip &>/dev/null; then
+    PIP=pip
+else
+    error "pip not found. Install Python 3.10+ first: https://python.org"
+    exit 1
 fi
 
-if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "aarch64" ]; then
-    error "Unsupported architecture: $ARCH"
-fi
-
-if ! command -v python3 &>/dev/null; then
-    error "python3 not found. Install Python 3.10+ first."
-fi
-
-PY_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
-PY_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
-    error "Python 3.10+ required. Found: ${PY_MAJOR}.${PY_MINOR}"
-fi
-
-info "Installing tq — TurboQuant model server manager"
-info "Platform: ${OS} ${ARCH}"
-
-TQ_VENV="$HOME/.tq/venv"
-TQ_BIN="$TQ_VENV/bin/tq"
-TQ_LINK_DIR="$HOME/.local/bin"
-TQ_LINK="$TQ_LINK_DIR/tq"
-
-info "Creating virtual environment..."
-python3 -m venv "$TQ_VENV"
-
-info "Installing tq package..."
-"$TQ_VENV/bin/pip" install -q "tq-serve[chat]"
-
-info "Installing TurboQuant+ llama-server binary..."
-"$TQ_BIN" install
-
-mkdir -p "$TQ_LINK_DIR"
-ln -sf "$TQ_BIN" "$TQ_LINK"
-
-NEED_PATH_UPDATE=false
-case ":$PATH:" in
-    *":$TQ_LINK_DIR:"*) ;;
-    *) NEED_PATH_UPDATE=true ;;
-esac
-
-if [ "$NEED_PATH_UPDATE" = true ]; then
-    SHELL_RC="$HOME/.zshrc"
-    if [ "$SHELL" = "bash" ]; then
-        SHELL_RC="$HOME/.bashrc"
-    elif [ "$SHELL" = "fish" ]; then
-        SHELL_RC="$HOME/.config/fish/config.fish"
-    fi
-
-    if [ "$SHELL" = "fish" ]; then
-        if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
-            echo '' >> "$SHELL_RC"
-            echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
-            echo 'set -gx PATH $PATH '"'$TQ_LINK_DIR'" >> "$SHELL_RC"
-        fi
+if "$PIP" install --upgrade tq-serve 2>&1; then
+    info "tq-serve installed"
+else
+    # Try with --break-system-packages for externally managed environments
+    warn "pip install failed — retrying with --break-system-packages..."
+    if "$PIP" install --upgrade --break-system-packages tq-serve 2>&1; then
+        info "tq-serve installed"
     else
-        if ! grep -q 'tq-serve' "$SHELL_RC" 2>/dev/null; then
-            echo '' >> "$SHELL_RC"
-            echo '# tq — TurboQuant model server manager' >> "$SHELL_RC"
-            echo 'export PATH="$PATH:'"$TQ_LINK_DIR"'"' >> "$SHELL_RC"
-        fi
+        error "pip install failed. Try: python3 -m pip install --user tq-serve"
+        exit 1
     fi
 fi
 
-export PATH="$PATH:$TQ_LINK_DIR"
-
-mkdir -p "$HOME/.tq/models"
-
-echo ""
-info "${BOLD}Installation complete!${RESET}"
-echo ""
-echo "  tq doctor          # Verify setup"
-echo "    tq list            # List local GGUF models"
-echo "    tq search <query>  # Search HuggingFace"
-echo "    tq download <id>   # Download a model"
-echo "    tq serve 1         # Launch with auto-configured TurboQuant"
-echo "    tq chat            # Interactive coding agent (local AI)"
-if [ "$NEED_PATH_UPDATE" = true ]; then
-    echo ""
-    warn "Open a new terminal for tq to be in PATH, or run:"
-    echo "  source $SHELL_RC"
+# --- verify tq command ---
+if ! command -v tq &>/dev/null; then
+    warn "tq not on PATH. You may need to add your Python bin directory to PATH."
+    echo -e "${DIM}  Usually: export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
 fi
+
+# --- install binary ---
+step "Downloading TurboQuant+ llama-server binary..."
+if command -v tq &>/dev/null; then
+    if tq install 2>&1; then
+        info "llama-server binary installed"
+    else
+        warn "Binary install failed or not available for your platform."
+        echo -e "${DIM}  You can run 'tq install' manually later.${RESET}"
+    fi
+else
+    warn "tq command not found on PATH — skipping binary install."
+    echo -e "${DIM}  Run 'tq install' after adding tq to your PATH.${RESET}"
+fi
+
+# --- done ---
+echo ""
+step "Running tq doctor..."
+if command -v tq &>/dev/null; then
+    tq doctor || true
+else
+    warn "Cannot run 'tq doctor' — tq not on PATH."
+fi
+
+echo ""
+echo -e "${BOLD}Done!${RESET} Quick start:"
+echo -e "  ${DIM}tq search \"qwen 3b\"${RESET}       # Find a model"
+echo -e "  ${DIM}tq serve 1${RESET}                   # Launch server"
+echo -e "  ${DIM}tq chat${RESET}                      # Start chatting"

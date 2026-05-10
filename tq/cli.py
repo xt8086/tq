@@ -25,6 +25,34 @@ from .types import ServerConfig, CacheType
 console = Console()
 
 
+def _ensure_binary() -> str | None:
+    try:
+        _find_binary(cfg.get_binary_path())
+        return None
+    except FileNotFoundError:
+        pass
+    platform_tag = get_platform_tag()
+    if not platform_tag:
+        console.print("[red]llama-server not found and your platform is not supported for auto-install.[/red]")
+        return None
+    try:
+        answer = input("  llama-server not found. Download now? [Y/n]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    if answer in ("n", "no"):
+        console.print("[dim]Skipped. Run 'tq install' later.[/dim]")
+        return None
+    try:
+        path = install_binary(force=False)
+        console.print(f"[green]Installed:[/green] {path}")
+        return path
+    except Exception as e:
+        console.print(f"[red]Install failed:[/red] {e}")
+        console.print("[dim]You can run 'tq install' manually later.[/dim]")
+        return None
+
+
 def _short_path(path: str) -> str:
     home = os.path.expanduser("~")
     if path.startswith(home):
@@ -130,6 +158,7 @@ def cmd_download(args):
 
 
 def cmd_serve(args):
+    _ensure_binary()
     model_dir = cfg.get_model_dir()
     port = args.port or cfg.get_port()
     host = args.host or cfg.get_host()
@@ -431,6 +460,13 @@ def cmd_doctor(args):
     except FileNotFoundError:
         console.print("[red]✗[/red] llama-server binary not found")
         issues.append("binary")
+        _ensure_binary()
+        try:
+            binary = _find_binary(binary_path)
+            console.print(f"[green]✓[/green] llama-server found after install: {binary}")
+            issues.remove("binary")
+        except FileNotFoundError:
+            pass
 
     model_dir = cfg.get_model_dir()
     if os.path.isdir(model_dir):
@@ -463,6 +499,7 @@ def cmd_doctor(args):
 
 
 def cmd_chat(args):
+    _ensure_binary()
     try:
         from .chat.repl import ChatSession
         from .chat.permissions import PermissionConfig

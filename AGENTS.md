@@ -6,7 +6,7 @@
 - **PyPI**: https://pypi.org/project/tq-serve/ (owner: `wondermotor_ai`)
 - **GitHub**: git@github.com:xt8086/tq.git (branch: main)
 - **Website**: wondermotor.com (index.html in repo root)
-- **Current version**: 0.4.15
+- **Current version**: 0.4.16
 
 ## Architecture
 
@@ -86,6 +86,7 @@ Tool support detection logic (`_detect_tool_support`):
 - 0.4.13 — Remove 4-step workflow (ANALYZE→PLAN→EXECUTE→FINALIZE) from non-tool system prompt; remove FINALIZE truncation from extract_python_blocks(). Workflow was ineffective for small models; execution cap (_code_exec_limit=5) remains as real loop prevention.
 - 0.4.14 — Auto-compaction: detect context at 80% of n_ctx, compress before overflow. Write ~/.tq/AGENTS.md on startup with connection info, token budget, and mode-specific instructions for external AI agents (opencode, pi, etc.).
 - 0.4.15 — `tq search` now numbers results and prompts for download by number. Press Enter to skip.
+- 0.4.16 — Auto-prompt `tq install` when llama-server binary missing (tq serve/chat/doctor). Added install.sh for one-liner curl install. Updated README with binary dependency explanation.
 
 ## Design Decisions
 - `tq remove` only removes models in tq's model_dir (`~/.tq/models/`), not system-wide models

@@ -6,21 +6,26 @@ Auto-configured llama-server with KV cache compression.
 
 ```bash
 # One-liner (macOS / Linux)
-curl -fsSL https://your-droplet/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/xt8086/tq/main/install.sh | bash
 
-# Or via pip
+# Or via pip (then run 'tq install' for the binary)
 pip install tq-serve
 tq install
 ```
+
+> **Note:** `tq-serve` is a pure Python package — it does NOT include the `llama-server` binary.
+> The binary comes from [TheTom/llama-cpp-turboquant](https://github.com/TheTom/llama-cpp-turboquant),
+> a fork of llama.cpp with TurboQuant KV cache compression built in.
+> `tq install` downloads the correct binary for your platform (macOS Metal, Linux CUDA/ROCm).
 
 ## Quick Start
 
 ```bash
 tq doctor                        # Verify setup
 tq list                          # List local GGUF models
-tq search "qwen2.5 coder 7b"    # Search HuggingFace
-tq download bartowski/Qwen2.5-Coder-7B-Instruct-GGUF
+tq search "qwen2.5 coder 7b"    # Search HuggingFace (then pick a # to download)
 tq serve 1                       # Launch with auto-configured TurboQuant
+tq chat                          # Interactive coding agent
 ```
 
 ## How It Works
@@ -43,7 +48,7 @@ Example: A Q4_K_M model on Apple M1 with 8GB RAM gets:
 | Command | Description |
 |---------|-------------|
 | `tq list` | List local GGUF models |
-| `tq search <query>` | Search HuggingFace for GGUF models |
+| `tq search <query>` | Search HuggingFace for GGUF models (numbered, with download prompt) |
 | `tq download <model>` | Download a model from HuggingFace |
 | `tq remove <model>` | Remove a downloaded model |
 | `tq serve <model>` | Launch with auto TurboQuant config |
@@ -53,7 +58,7 @@ Example: A Q4_K_M model on Apple M1 with 8GB RAM gets:
 | `tq stop` | Stop the server |
 | `tq logs` | View server logs |
 | `tq validate <model>` | Pre-flight check |
-| `tq install` | Download TurboQuant+ binary |
+| `tq install` | Download TurboQuant+ binary (from TheTom/llama-cpp-turboquant) |
 | `tq doctor` | Verify setup |
 | `tq config show` | Show/edit configuration |
 | `tq chat` | Interactive coding agent (local AI) |
