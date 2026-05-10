@@ -62,19 +62,54 @@ def cmd_search(args):
         return
 
     table = Table(title=f"Search: {args.query}", box=box.ROUNDED)
+    table.add_column("#", style="bold", justify="right")
     table.add_column("Model ID", style="cyan")
     table.add_column("Downloads", justify="right", style="green")
     table.add_column("GGUF Files", justify="right", style="yellow")
 
-    for r in results:
+    for i, r in enumerate(results, 1):
         table.add_row(
+            str(i),
             r["id"],
             f"{r.get('downloads', 0):,}",
             str(r["total_gguf_files"]),
         )
 
     console.print(table)
-    console.print("\n[dim]Use 'tq download <model_id>' to download.[/dim]")
+    console.print()
+
+    try:
+        choice = input("  Download which model? [# or Enter to skip]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if not choice:
+        return
+
+    try:
+        idx = int(choice)
+    except ValueError:
+        console.print(f"[dim]Skipped.[/dim]")
+        return
+
+    if idx < 1 or idx > len(results):
+        console.print(f"[red]Invalid selection: {idx}[/red]")
+        return
+
+    model_id = results[idx - 1]["id"]
+    model_dir = cfg.get_model_dir()
+    console.print(f"[bold]Downloading[/bold] {model_id}")
+
+    try:
+        path = download_model(
+            model_id=model_id,
+            model_dir=model_dir,
+        )
+        console.print(f"[green]Downloaded:[/green] {path}")
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
 
 
 def cmd_download(args):
