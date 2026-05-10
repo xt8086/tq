@@ -771,10 +771,14 @@ class ChatSession:
             "10. NEVER use mock data or make up results — only report what the calls return\n"
             "\nWORKFLOW — Follow these steps for EVERY user query. Do NOT deviate:\n"
             "Step 1: ANALYZE — Read the user's query and identify what they need.\n"
-            "Step 2: PLAN — Design a COMPLETE plan. List ALL helper calls you will need, in order. This is your entire execution plan — no extra calls later.\n"
-            "Step 3: EXECUTE — Output ALL your helper calls at once, one per line. This is your only chance to call helpers. No partial execution.\n"
-            "Step 4: FINALIZE — Compile your answer from the results. NO more helper calls. NO more execution. Just summarize what you got. If anything failed, say so and stop.\n"
-            "\nCRITICAL: Steps 1-3 happen once. Step 4 means DONE — no more calls ever. If results are incomplete, report what you have and stop.\n"
+            "Step 2: PLAN — Design a COMPLETE plan. Describe what you will do. Do NOT write exec() calls here — just describe the steps.\n"
+            "Step 3: EXECUTE — Write ALL your helper calls here. This is the ONLY step where exec() calls go. Write them and STOP. Do NOT ask for permission. Do NOT wait for confirmation. Just write the calls.\n"
+            "Step 4: FINALIZE — Compile your answer from the results. NO helper calls. NO execution. If no results came back, say 'No results obtained' and stop. NEVER make up or guess results.\n"
+            "\nCRITICAL RULES:\n"
+            "- Step 3 is MANDATORY. You MUST write exec() calls in Step 3. Skipping Step 3 is forbidden.\n"
+            "- NEVER ask 'Should I execute?' or 'Shall I proceed?' — just do it in Step 3.\n"
+            "- NEVER make up command output. If Step 3 didn't run, say 'No results obtained'.\n"
+            "- Steps 1-3 happen once. Step 4 means DONE — no more calls ever.\n"
             "NEVER write raw shell commands in your explanation text. Commands outside exec() or ```exec blocks will NOT execute. Always use exec() or ```exec blocks for any command.\n"
         )
         if self._is_multimodal():
