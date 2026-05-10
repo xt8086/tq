@@ -52,6 +52,10 @@ _SHELL_CMD_RE = re.compile(
 
 
 def extract_python_blocks(text: str) -> list[str]:
+    finalize_re = re.compile(r'(?:Step\s*4|FINALIZE)\b', re.IGNORECASE)
+    finalize_match = finalize_re.search(text)
+    if finalize_match:
+        text = text[:finalize_match.start()]
     exec_blocks = re.findall(r'```exec\s*\n(.*?)```', text, re.DOTALL)
     if exec_blocks:
         return [_wrap_if_shell(b) for b in exec_blocks]
