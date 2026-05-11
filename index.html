@@ -341,7 +341,10 @@ function copyInstall(type) {
   };
   const text = texts[type];
   navigator.clipboard.writeText(text).then(() => {
-    const btn = event.target;
+    const buttons = document.querySelectorAll('.copy-btn');
+    let btn;
+    if (type === 'unix') btn = buttons[0];
+    else btn = buttons[1];
     btn.textContent = 'Copied';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
