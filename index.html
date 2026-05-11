@@ -253,10 +253,18 @@
     <div class="tool-credit">Manager for <a href="https://github.com/TheTom/llama-cpp-turboquant">TurboQuant+</a> by <a href="https://github.com/TheTom">TheTom</a></div>
 
     <div class="install-box">
-      <div class="install-label">Install &mdash; macOS (Apple Silicon) &amp; Windows (CUDA)</div>
+      <div class="install-label">Install &mdash; macOS (Apple Silicon)</div>
       <div class="code-row">
         <div class="code-box"><span class="prompt">$</span> curl -fsSL https://wondermotor.com/install.sh | bash</div>
-        <button class="copy-btn" onclick="copyInstall()">Copy</button>
+        <button class="copy-btn" onclick="copyInstall('unix')">Copy</button>
+      </div>
+    </div>
+
+    <div class="install-box">
+      <div class="install-label">Install &mdash; Windows (x64, NVIDIA GPU, PowerShell)</div>
+      <div class="code-row">
+        <div class="code-box"><span class="prompt">PS&gt;</span> pip install tq-serve; tq install</div>
+        <button class="copy-btn" onclick="copyInstall('win')">Copy</button>
       </div>
     </div>
 

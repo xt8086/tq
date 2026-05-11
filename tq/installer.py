@@ -23,7 +23,19 @@ def get_platform_tag() -> Optional[str]:
     if system == "Darwin" and machine == "arm64":
         return "macos-arm64-metal"
 
+    if system == "Windows" and machine.endswith("64"):
+        if _has_nvidia():
+            return "windows-x64-cuda"
+        return None
+
     if system == "Linux":
+        if _has_nvidia():
+            return "linux-x64-cuda"
+        if _has_amd():
+            return "linux-x64-rocm"
+        return "linux-x64-cpu"
+
+    return None
         if _has_nvidia():
             return "linux-x64-cuda"
         if _has_amd():
@@ -74,7 +86,7 @@ def install_binary(force: bool = False) -> str:
     if not platform_tag:
         raise RuntimeError(
             f"Unsupported platform: {platform.system()} {platform.machine()}. "
-            f"Only macOS arm64 and Linux x86_64 are currently supported."
+            f"Only macOS arm64, Linux x86_64, and Windows x86_64 are currently supported."
         )
 
     os.makedirs(BIN_DIR, exist_ok=True)
@@ -145,9 +157,10 @@ def install_binary(force: bool = False) -> str:
 
 
 def _find_llama_server(directory: str) -> Optional[str]:
+    names = ["llama-server.exe", "llama-server"] if platform.system() == "Windows" else ["llama-server"]
     for root, _dirs, files in os.walk(directory):
         for f in files:
-            if f == "llama-server":
+            if f in names:
                 return os.path.join(root, f)
     return None
 
