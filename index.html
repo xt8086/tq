@@ -334,9 +334,14 @@
   </div>
 </div>
 <script>
-function copyInstall() {
-  const text = 'curl -fsSL https://wondermotor.com/install.sh | bash';  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('.copy-btn');
+function copyInstall(type) {
+  const texts = {
+    unix: 'curl -fsSL https://wondermotor.com/install.sh | bash',
+    win: 'pip install tq-serve; tq install'
+  };
+  const text = texts[type];
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
     btn.textContent = 'Copied';
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
